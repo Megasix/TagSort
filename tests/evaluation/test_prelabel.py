@@ -229,3 +229,18 @@ def test_cli_prelabel(
     monkeypatch.delenv("OPENAI_API_KEY")
     assert cli.main(["prelabel", str(root), "--with", "openai", "--overwrite"]) == 2
     assert "OPENAI_API_KEY is not set" in capsys.readouterr().err
+
+
+def test_rows_of_a_photo_stay_together_on_the_page() -> None:
+    from tagsort.evaluation.prelabel import Row, _page
+
+    rows = [
+        Row("a.jpg", "s", "GJ07966", priority=3),
+        Row("a.jpg", "s", "0086", priority=0),
+        Row("b.jpg", "s", "-", priority=1),
+        Row("c.jpg", "s", "GJ07967", priority=3),
+    ]
+    page = _page("lot", rows)
+    order = [page.index(f'data-index="{i}"') for i in range(4)]
+    # a.jpg (both rows, since one needs attention), then b.jpg, then c.jpg.
+    assert order[0] < order[1] < order[2] < order[3]
