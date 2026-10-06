@@ -73,6 +73,7 @@ mlruns/
 # --- Secrets ---
 .env
 .env.*
+*.env
 !.env.example
 *.pem
 *.key
@@ -122,3 +123,6 @@ Thumbs.db
 
 # --- Claude Code local settings ---
 .claude/settings.local.json
+
+# --- Local datasets: photos and labels live outside the repository ---
+TagSort-data/
