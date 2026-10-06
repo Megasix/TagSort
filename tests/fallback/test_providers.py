@@ -66,7 +66,7 @@ def openai_ok(text: str = json.dumps(ANSWER), **changes: Any) -> dict[str, Any]:
 
 def gemini_ok(text: str = json.dumps(ANSWER), **changes: Any) -> dict[str, Any]:
     body: dict[str, Any] = {
-        "modelVersion": "gemini-3.1-pro-preview",
+        "modelVersion": "gemini-3.5-flash-lite",
         "candidates": [
             {
                 "content": {"parts": [{"text": "thinking...", "thought": True}, {"text": text}]},
