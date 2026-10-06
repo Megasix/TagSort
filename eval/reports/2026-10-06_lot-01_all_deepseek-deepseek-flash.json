@@ -47,6 +47,9 @@
     "input": 27643,
     "output": 9483
   },
-  "price_per_million_tokens": null,
-  "cost_per_1000_photos_usd": null
+  "price_per_million_tokens": {
+    "input": 0.15,
+    "output": 0.6
+  },
+  "cost_per_1000_photos_usd": 0.47
 }
