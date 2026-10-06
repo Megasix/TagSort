@@ -68,6 +68,17 @@ An invalid profile raises `ProfileError` when it is loaded, with the location of
 Patterns use a small regex subset that describes a finite set of texts; see
 [docs/patterns.md](docs/patterns.md).
 
+## Measuring accuracy on your photos
+
+`tagsort-eval` reads a labeled folder of your photos and reports exact matches, silent
+errors (wrong readings that were accepted), cost and time per photo. See
+[docs/evaluation.md](docs/evaluation.md) for the dataset format and every metric.
+
+```sh
+export GEMINI_API_KEY=...
+tagsort-eval run path/to/dataset --provider gemini --model gemini-3.5-flash-lite
+```
+
 ## Contracts
 
 Inputs and outputs are versioned JSON Schemas, so applications in any language can use them
