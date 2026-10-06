@@ -239,3 +239,74 @@ def test_upside_down_reading_already_listed_is_not_duplicated() -> None:
     provider = FakeProvider(tags=(raw("9800", "uncertain", ("0086",)),))
     (tag,) = Reader(profile, backend=provider).read(make_image()).tags
     assert [c.text for c in tag.candidates] == ["0086"]
+
+
+@dataclass
+class SlowProvider(FakeProvider):
+    """Answers after a delay and records how many requests overlap."""
+
+    delay: float = 0.05
+    active: int = 0
+    peak: int = 0
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def read(self, request: VisionRequest) -> VisionAnswer:
+        import time
+
+        with self.lock:
+            self.active += 1
+            self.peak = max(self.peak, self.active)
+        time.sleep(self.delay)
+        with self.lock:
+            self.active -= 1
+        width = request.width
+        return VisionAnswer(tags=(raw(text=f"GJ{width:05d}"),), model="slow")
+
+
+def test_parallel_batch_keeps_order_and_overlaps_requests() -> None:
+    profile = Profile.from_dict(
+        {
+            "schema_version": "1.0",
+            "name": "W",
+            "tags_per_individual": 1,
+            "tags": [{"id": "primary", "pattern": "GJ\\d{5}"}],
+        }
+    )
+    provider = SlowProvider()
+    reader = Reader(profile, backend=provider)
+    widths = [20 + i for i in range(16)]
+    results = list(reader.read_batch((make_image(w, 10) for w in widths), workers=4))
+    assert [r.tags[0].text for r in results] == [f"GJ{w:05d}" for w in widths]
+    assert provider.peak == 4
+
+
+def test_parallel_batch_holds_a_bounded_window() -> None:
+    reader = Reader(PROFILE, backend=SlowProvider(delay=0.0))
+    consumed = 0
+
+    def images() -> Any:
+        nonlocal consumed
+        for _ in range(100):
+            consumed += 1
+            yield make_image()
+
+    batch = reader.read_batch(images(), workers=3)
+    next(batch)
+    assert consumed <= 2 * 3 + 1
+    batch.close()
+
+
+def test_parallel_batch_stops_at_the_first_error() -> None:
+    from tagsort import ImageError
+
+    reader = Reader(PROFILE, backend=SlowProvider(delay=0.0))
+    images: list[Any] = [make_image(), b"not an image", make_image()]
+    batch = reader.read_batch(images, workers=2)
+    next(batch)
+    with pytest.raises(ImageError):
+        next(batch)
+
+
+def test_workers_must_be_positive() -> None:
+    with pytest.raises(ValueError, match="workers"):
+        list(Reader(PROFILE, backend=FakeProvider()).read_batch([], workers=0))

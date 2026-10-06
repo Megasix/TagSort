@@ -10,7 +10,9 @@ uv run tagsort-eval run path/to/dataset --provider gemini --model gemini-3.5-fla
 uv run tagsort-eval compare eval/reports/old.json eval/reports/new.json
 ```
 
-`run` caches every answer in `<dataset>/predictions/<provider>-<model>/`, so running again
+`run` and `prelabel` read 8 photos at a time by default (`--workers`); with Gemini Flash-Lite,
+160 photos take about 40 seconds. Rate-limited requests are retried, so lower `--workers` if a
+provider account has tight limits. `run` caches every answer in `<dataset>/predictions/<provider>-<model>/`, so running again
 re-scores without paying for the same photo twice (`--force` reads again). Reports are
 written to `eval/reports/` as `<date>_<dataset>_<split>_<provider>-<model>.{md,json}`; they
 hold aggregate numbers only, never tag texts or photos.

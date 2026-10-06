@@ -115,6 +115,7 @@ def prelabel(
     profile: Profile,
     providers: Sequence[VisionProvider],
     overwrite: bool = False,
+    workers: int = 1,
 ) -> list[Row]:
     """Read every photo of ``dataset`` with one or two providers and write the review files.
 
@@ -136,7 +137,7 @@ def prelabel(
     readings: list[dict[str, list[Tag]]] = []
     for provider in providers:
         cache = dataset / "predictions" / f"{provider.name}-{provider.model}"
-        run_dataset(images, profile=profile, provider=provider, cache=cache)
+        run_dataset(images, profile=profile, provider=provider, cache=cache, workers=workers)
         readings.append({p.name: _cached_tags(cache / f"{p.stem}.json") for p in photos})
 
     rows: list[Row] = []

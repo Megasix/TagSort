@@ -53,6 +53,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     run.add_argument("--split", help="evaluate only this split, for example test")
     run.add_argument("--limit", type=int, help="read only the first N photos")
     run.add_argument("--force", action="store_true", help="read again photos already cached")
+    run.add_argument("--workers", type=int, default=8, help="photos read at the same time")
     run.add_argument("--reports", type=Path, default=DEFAULT_REPORTS, help="report folder")
     run.add_argument("--name", help="dataset name in the report (default: folder name)")
     run.add_argument(
@@ -76,6 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "and openai:gpt-6-luna)",
     )
     pre.add_argument("--overwrite", action="store_true", help="replace an existing labels.csv")
+    pre.add_argument("--workers", type=int, default=8, help="photos read at the same time")
 
     comparison = commands.add_parser("compare", help="fail if NEW regresses against BASE")
     comparison.add_argument("base", type=Path)
@@ -140,7 +142,11 @@ def _prelabel(args: argparse.Namespace) -> int:
         providers.append(_provider(name, model or None))
     try:
         rows = prelabel(
-            args.dataset, profile=profile, providers=providers, overwrite=args.overwrite
+            args.dataset,
+            profile=profile,
+            providers=providers,
+            overwrite=args.overwrite,
+            workers=args.workers,
         )
     finally:
         for provider in providers:
@@ -180,6 +186,7 @@ def _run(args: argparse.Namespace) -> int:
             provider=provider,
             cache=cache,
             force=args.force,
+            workers=args.workers,
             progress=progress,
         )
 
@@ -203,6 +210,12 @@ def _run(args: argparse.Namespace) -> int:
         price_per_million=price,
         created=dt.date.today().isoformat(),
         prelabeled_with=tuple(prelabeled_with),
+        workers=args.workers,
+        photos_per_minute=(
+            round(result.read_now / result.wall_seconds * 60, 1)
+            if result.read_now and result.wall_seconds
+            else None
+        ),
     )
     args.reports.mkdir(parents=True, exist_ok=True)
     stem = _slug(f"{report.created}_{report.dataset}_{args.split or 'all'}_{args.provider}-{model}")

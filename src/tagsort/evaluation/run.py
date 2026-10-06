@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,7 +15,7 @@ from typing import Any
 from tagsort.errors import TagSortError
 from tagsort.evaluation.dataset import LabeledImage
 from tagsort.evaluation.metrics import ImageOutcome, match_tags
-from tagsort.fallback.base import BoxFormat, VisionAnswer, VisionProvider, VisionRequest
+from tagsort.fallback.base import BoxFormat, Usage, VisionAnswer, VisionProvider, VisionRequest
 from tagsort.pipeline.reader import Reader
 from tagsort.profile import Profile
 from tagsort.types import Candidate, Tag
@@ -24,13 +27,19 @@ logger = logging.getLogger("tagsort.evaluation")
 USAGE_FILE = "_usage.json"
 
 
-@dataclass
 class CountingProvider:
-    """Wraps a provider to record the tokens billed for each photo."""
+    """Wraps a provider to record the tokens billed, per request and in total.
 
-    inner: VisionProvider
-    input_tokens: int = 0
-    output_tokens: int = 0
+    Safe to share between threads: each thread sees the usage of its own last request.
+    """
+
+    def __init__(self, inner: VisionProvider) -> None:
+        """Wrap ``inner``."""
+        self.inner = inner
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self._lock = threading.Lock()
+        self._local = threading.local()
 
     @property
     def name(self) -> str:
@@ -55,18 +64,35 @@ class CountingProvider:
     def read(self, request: VisionRequest) -> VisionAnswer:
         """Read through the wrapped provider and add up the tokens."""
         answer = self.inner.read(request)
-        self.input_tokens += answer.usage.input_tokens
-        self.output_tokens += answer.usage.output_tokens
+        self._local.usage = answer.usage
+        with self._lock:
+            self.input_tokens += answer.usage.input_tokens
+            self.output_tokens += answer.usage.output_tokens
         return answer
+
+    def last_usage(self) -> Usage:
+        """Usage of the last request made by the calling thread."""
+        usage: Usage = getattr(self._local, "usage", Usage())
+        return usage
 
 
 @dataclass(frozen=True)
 class RunResult:
-    """Outcomes of a run and the tokens billed for the photos it covers."""
+    """Outcomes of a run and the tokens billed for the photos it covers.
+
+    Attributes:
+        outcomes: One per photo, in the order given.
+        input_tokens: Tokens billed for these photos, including earlier cached runs.
+        output_tokens: Same, for output tokens.
+        read_now: Photos sent to the provider during this run (not from the cache).
+        wall_seconds: Wall-clock time of this run.
+    """
 
     outcomes: list[ImageOutcome]
     input_tokens: int
     output_tokens: int
+    read_now: int = 0
+    wall_seconds: float = 0.0
 
 
 def run_dataset(
@@ -76,13 +102,16 @@ def run_dataset(
     provider: VisionProvider,
     cache: Path,
     force: bool = False,
+    workers: int = 1,
     progress: Callable[[int, int, ImageOutcome], None] | None = None,
 ) -> RunResult:
     """Read every photo, reusing results already in ``cache`` unless ``force`` is set.
 
-    Each result is saved to ``cache/<photo>.json`` as soon as it is read, so an
-    interrupted run resumes where it stopped.
+    ``workers`` photos are read at the same time. Each result is saved to
+    ``cache/<photo>.json`` as soon as it is read, so an interrupted run resumes where it
+    stopped. ``progress`` is called in the order of ``images``.
     """
+    start = time.perf_counter()
     cache.mkdir(parents=True, exist_ok=True)
     usage_path = cache / USAGE_FILE
     usage: dict[str, list[int]] = (
@@ -90,35 +119,37 @@ def run_dataset(
     )
     counting = CountingProvider(provider)
     reader = Reader(profile, backend=counting)
-    outcomes: list[ImageOutcome] = []
-    for index, image in enumerate(images, 1):
+
+    def read_one(image: LabeledImage) -> tuple[ImageOutcome, Usage | None]:
         cached = cache / f"{image.path.stem}.json"
         if cached.is_file() and not force:
-            outcome = _outcome(image, json.loads(cached.read_text(encoding="utf-8")))
-        else:
-            before = (counting.input_tokens, counting.output_tokens)
-            try:
-                result = reader.read(image.path)
-            except TagSortError as error:
-                outcome = ImageOutcome(
-                    image=image.path.name, session=image.session, error=str(error)
-                )
-            else:
-                cached.write_text(result.to_json(indent=2), encoding="utf-8")
-                usage[image.path.name] = [
-                    counting.input_tokens - before[0],
-                    counting.output_tokens - before[1],
-                ]
+            return _outcome(image, json.loads(cached.read_text(encoding="utf-8"))), None
+        try:
+            result = reader.read(image.path)
+        except TagSortError as error:
+            failed = ImageOutcome(image=image.path.name, session=image.session, error=str(error))
+            return failed, None
+        cached.write_text(result.to_json(indent=2), encoding="utf-8")
+        return _outcome(image, result.to_dict()), counting.last_usage()
+
+    outcomes: list[ImageOutcome] = []
+    read_now = 0
+    with ThreadPoolExecutor(max_workers=max(workers, 1)) as pool:
+        for index, (outcome, spent) in enumerate(pool.map(read_one, images), 1):
+            if spent is not None:
+                read_now += 1
+                usage[outcome.image] = [spent.input_tokens, spent.output_tokens]
                 usage_path.write_text(json.dumps(usage, indent=2), encoding="utf-8")
-                outcome = _outcome(image, result.to_dict())
-        outcomes.append(outcome)
-        if progress is not None:
-            progress(index, len(images), outcome)
+            outcomes.append(outcome)
+            if progress is not None:
+                progress(index, len(images), outcome)
     names = {image.path.name for image in images}
     return RunResult(
         outcomes=outcomes,
         input_tokens=sum(tokens[0] for name, tokens in usage.items() if name in names),
         output_tokens=sum(tokens[1] for name, tokens in usage.items() if name in names),
+        read_now=read_now,
+        wall_seconds=time.perf_counter() - start,
     )
 
 
