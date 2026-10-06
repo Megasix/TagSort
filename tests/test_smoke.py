@@ -25,6 +25,7 @@ def test_public_api() -> None:
         "GeminiProvider",
         "ImageError",
         "ImageInfo",
+        "ModelError",
         "OpenAIProvider",
         "PatternError",
         "Point",
@@ -44,6 +45,8 @@ def test_public_api() -> None:
         "VisionProvider",
         "VisionRequest",
         "__version__",
+        "available_models",
+        "download_model",
     ]
     for name in tagsort.__all__:
         assert hasattr(tagsort, name)

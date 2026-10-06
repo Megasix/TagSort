@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from tagsort._version import __version__
 from tagsort.errors import ImageError, PatternError, ProfileError, ProviderError, TagSortError
 from tagsort.fallback.base import ProviderTag, Usage, VisionAnswer, VisionProvider, VisionRequest
+from tagsort.models import ModelError, available_models, download_model
 from tagsort.pipeline.reader import Reader
 from tagsort.profile import Profile, TagSpec
 from tagsort.types import Candidate, ImageInfo, Point, ReadResult, Tag, TagSource, TagStatus
@@ -30,6 +31,7 @@ __all__ = [
     "GeminiProvider",
     "ImageError",
     "ImageInfo",
+    "ModelError",
     "OpenAIProvider",
     "PatternError",
     "Point",
@@ -49,6 +51,8 @@ __all__ = [
     "VisionProvider",
     "VisionRequest",
     "__version__",
+    "available_models",
+    "download_model",
 ]
 
 logging.getLogger("tagsort").addHandler(logging.NullHandler())
