@@ -13,7 +13,7 @@ authors = [{ name = "Barry Lawson" }]
 requires-python = ">=3.10"
 dependencies = []
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
@@ -40,10 +40,12 @@ train = []
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4.26.0",
     "mypy>=2.4",
     "pytest>=9.1",
     "pytest-cov>=7.1",
     "ruff>=0.16",
+    "types-jsonschema>=4.26.0.20261006",
 ]
 
 [tool.hatch.version]
@@ -56,7 +58,16 @@ exclude = ["**/.gitkeep"]
 packages = ["src/tagsort"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/tagsort", "tests", "LICENSE", "NOTICE", "README.md"]
+include = [
+    "src/tagsort",
+    "tests",
+    "schemas",
+    "docs",
+    "reference",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+]
 
 [tool.ruff]
 line-length = 100
@@ -85,8 +96,12 @@ select = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.isort]
+known-first-party = ["tagsort", "tests"]
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D"]
+# Tests feed arbitrary JSON documents to the loaders, so Any is the honest type there.
+"tests/**" = ["D", "ANN401"]
 ".github/scripts/**" = ["T20"]
 
 [tool.ruff.format]
