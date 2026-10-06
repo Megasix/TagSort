@@ -1,0 +1,230 @@
+"""Read a folder of photos with one or more vision API providers and compare to labels.
+
+This is a development tool for milestone M2, not part of the engine. The full evaluation
+harness (``tagsort-eval``) comes in M3.
+
+Dataset layout (kept outside the repository):
+
+    <dataset>/photos/*.jpg      the photos
+    <dataset>/labels.csv        image,session,tag_id,text,notes (one row per tag)
+    <dataset>/profile.json      the profile, following schemas/profile.v1.json
+
+API keys are read from the environment: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY.
+
+Usage:
+
+    uv run python eval/try_batch.py <dataset> --check
+    uv run python eval/try_batch.py <dataset> --provider anthropic --limit 5
+    uv run python eval/try_batch.py <dataset> --provider anthropic openai gemini
+
+Results are written to <dataset>/results/<provider>/<image>.json.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import os
+import sys
+from collections import defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+
+import httpx
+
+from tagsort import (
+    AnthropicProvider,
+    GeminiProvider,
+    OpenAIProvider,
+    Profile,
+    ProviderError,
+    Reader,
+    ReadResult,
+    TagSortError,
+    VisionAnswer,
+    VisionProvider,
+    VisionRequest,
+)
+from tagsort.fallback._http import HttpProvider
+from tagsort.fallback.base import BoxFormat
+
+PROVIDERS: dict[str, tuple[type[HttpProvider], str]] = {
+    "anthropic": (AnthropicProvider, "ANTHROPIC_API_KEY"),
+    "openai": (OpenAIProvider, "OPENAI_API_KEY"),
+    "gemini": (GeminiProvider, "GEMINI_API_KEY"),
+}
+
+# USD per million input and output tokens, from the providers' pricing pages on
+# 2026-10-06. Check them before relying on the cost estimate.
+PRICES: dict[str, tuple[float, float]] = {
+    "claude-opus-5-5": (4.0, 20.0),
+    "gpt-6.1-sol": (2.0, 10.0),
+    "gemini-3.1-pro-preview": (2.0, 12.0),
+}
+
+PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
+
+
+@dataclass
+class Counting:
+    """Wraps a provider to add up the tokens it bills."""
+
+    inner: VisionProvider
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def name(self) -> str:
+        return self.inner.name
+
+    @property
+    def model(self) -> str:
+        return self.inner.model
+
+    @property
+    def max_side(self) -> int:
+        return self.inner.max_side
+
+    @property
+    def box_format(self) -> BoxFormat:
+        return self.inner.box_format
+
+    def read(self, request: VisionRequest) -> VisionAnswer:
+        answer = self.inner.read(request)
+        self.input_tokens += answer.usage.input_tokens
+        self.output_tokens += answer.usage.output_tokens
+        return answer
+
+
+def load_labels(path: Path) -> dict[str, list[tuple[str, str]]]:
+    """Return image name -> list of (tag_id, text). '?' marks a tag nobody can read."""
+    labels: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            image = (row.get("image") or "").strip()
+            if not image or image.startswith("EXEMPLE_"):
+                continue
+            labels.setdefault(image, [])
+            text = (row.get("text") or "").strip()
+            if text:
+                labels[image].append(((row.get("tag_id") or "").strip(), text))
+    return labels
+
+
+def check_models() -> int:
+    """List each provider's models and say whether the default model is available."""
+    urls = {
+        "anthropic": "https://api.anthropic.com/v1/models?limit=1000",
+        "openai": "https://api.openai.com/v1/models",
+        "gemini": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+    }
+    status = 0
+    for name, (cls, variable) in PROVIDERS.items():
+        key = os.environ.get(variable)
+        if not key:
+            print(f"{name}: {variable} is not set, skipped")
+            continue
+        headers = {
+            "anthropic": {"x-api-key": key, "anthropic-version": "2023-06-01"},
+            "openai": {"Authorization": f"Bearer {key}"},
+            "gemini": {"x-goog-api-key": key},
+        }[name]
+        try:
+            response = httpx.get(urls[name], headers=headers, timeout=30)
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            print(f"{name}: cannot list models ({type(error).__name__})")
+            status = 1
+            continue
+        items = response.json().get("data") or response.json().get("models") or []
+        ids = {
+            str(item.get("id") or item.get("name", "")).removeprefix("models/") for item in items
+        }
+        found = cls.default_model in ids
+        print(f"{name}: default model {cls.default_model} {'available' if found else 'NOT FOUND'}")
+        if not found:
+            status = 1
+            print("  available:", ", ".join(sorted(ids)[:40]))
+    return status
+
+
+def run(dataset: Path, provider_name: str, limit: int | None) -> None:
+    cls, variable = PROVIDERS[provider_name]
+    key = os.environ.get(variable)
+    if not key:
+        sys.exit(f"{variable} is not set")
+    profile = Profile.from_file(dataset / "profile.json")
+    labels = load_labels(dataset / "labels.csv")
+    photos = sorted(
+        p for p in (dataset / "photos").iterdir() if p.suffix.lower() in PHOTO_SUFFIXES
+    )[:limit]
+    output = dataset / "results" / provider_name
+    output.mkdir(parents=True, exist_ok=True)
+
+    provider = Counting(cls(api_key=key))
+    reader = Reader(profile, backend=provider)
+    expected = found = silent = unlabeled = failed = 0
+    statuses: dict[str, int] = defaultdict(int)
+    for index, photo in enumerate(photos, 1):
+        try:
+            result: ReadResult = reader.read(photo)
+        except (ProviderError, TagSortError) as error:
+            failed += 1
+            print(f"[{index}/{len(photos)}] {photo.name}: ERROR {error}")
+            continue
+        (output / f"{photo.stem}.json").write_text(result.to_json(indent=2), encoding="utf-8")
+        truth = labels.get(photo.name)
+        read_texts = [tag.text for tag in result.tags if tag.text]
+        for tag in result.tags:
+            statuses[tag.status] += 1
+        if truth is None:
+            unlabeled += 1
+            verdict = "no label"
+        else:
+            readable = [text for _, text in truth if text != "?"]
+            hits = sum(1 for text in readable if text in read_texts)
+            wrong = [
+                tag.text
+                for tag in result.tags
+                if tag.status == "accepted" and tag.text not in readable
+            ]
+            expected += len(readable)
+            found += hits
+            silent += len(wrong)
+            verdict = f"{hits}/{len(readable)} read" + (f", SILENT ERROR {wrong}" if wrong else "")
+        summary = ", ".join(f"{t.text or '-'} ({t.status})" for t in result.tags) or "no tag"
+        print(f"[{index}/{len(photos)}] {photo.name}: {summary} -> {verdict}")
+
+    price_in, price_out = PRICES.get(provider.model, (0.0, 0.0))
+    cost = provider.input_tokens / 1e6 * price_in + provider.output_tokens / 1e6 * price_out
+    read_count = len(photos) - failed
+    print(f"\n{provider_name} ({provider.model}) on {len(photos)} photos")
+    print(
+        f"  tags read exactly: {found}/{expected}"
+        + (f" ({found / expected:.0%})" if expected else "")
+    )
+    print(f"  silent errors (accepted but wrong): {silent}")
+    print(f"  statuses: {dict(statuses)}; failed photos: {failed}; unlabeled: {unlabeled}")
+    print(f"  tokens: {provider.input_tokens} in, {provider.output_tokens} out")
+    if read_count and price_in:
+        print(f"  cost: ${cost:.3f}, about ${cost / read_count * 1000:.0f} per 1,000 photos")
+    print(f"  results: {output}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("dataset", type=Path)
+    parser.add_argument("--provider", nargs="+", choices=sorted(PROVIDERS), default=[])
+    parser.add_argument("--limit", type=int, default=None, help="read only the first N photos")
+    parser.add_argument("--check", action="store_true", help="check the default models exist")
+    args = parser.parse_args()
+    if args.check:
+        sys.exit(check_models())
+    if not args.provider:
+        parser.error("give --provider or --check")
+    for name in args.provider:
+        run(args.dataset, name, args.limit)
+
+
+if __name__ == "__main__":
+    main()
