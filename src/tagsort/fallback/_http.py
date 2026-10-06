@@ -22,6 +22,8 @@ logger = logging.getLogger("tagsort.fallback")
 
 _RETRY_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504, 529})
 _MAX_BACKOFF = 60.0
+# Error codes meaning the account has no credit left (OpenAI, Anthropic).
+_QUOTA_CODES = frozenset({"insufficient_quota", "billing_error"})
 
 
 class HttpProvider:
@@ -168,7 +170,10 @@ class HttpProvider:
     def _status_error(self, response: httpx.Response) -> ProviderError:
         status = response.status_code
         detail = _error_detail(response)
-        if status in (401, 403):
+        if status == 402 or _error_code(response) in _QUOTA_CODES:
+            # Retrying cannot help until the account is credited.
+            reason = "quota"
+        elif status in (401, 403):
             reason = "authentication"
         elif status == 429:
             reason = "rate_limit"
@@ -187,6 +192,22 @@ def _retry_after(response: httpx.Response) -> float | None:
         return max(float(value), 0.0)
     except ValueError:
         return None
+
+
+def _error_code(response: httpx.Response) -> str | None:
+    """Return the provider's machine-readable error code, if any."""
+    try:
+        data = response.json()
+    except json.JSONDecodeError:
+        return None
+    error = data.get("error") if isinstance(data, dict) else None
+    if not isinstance(error, dict):
+        return None
+    for key in ("code", "type"):
+        value = error.get(key)
+        if isinstance(value, str):
+            return value
+    return None
 
 
 def _error_detail(response: httpx.Response) -> str:

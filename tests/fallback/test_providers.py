@@ -354,3 +354,30 @@ def test_openai_skips_unknown_parts() -> None:
     body = openai_ok()
     body["output"][1]["content"].insert(0, "noise")
     assert Recorder(httpx.Response(200, json=body)).provider(OpenAIProvider).read(REQUEST).tags
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(
+            429, json={"error": {"message": "no credits", "code": "insufficient_quota"}}
+        ),
+        httpx.Response(400, json={"error": {"type": "billing_error", "message": "credit balance"}}),
+        httpx.Response(402, json={"error": {"message": "payment required"}}),
+    ],
+)
+def test_exhausted_quota_is_not_retried(response: httpx.Response) -> None:
+    recorder = Recorder(response)
+    with pytest.raises(ProviderError) as info:
+        recorder.provider(OpenAIProvider).read(REQUEST)
+    assert info.value.reason == "quota"
+    assert not info.value.retryable
+    assert len(recorder.requests) == 1
+    assert recorder.sleeps == []
+
+
+def test_error_code_must_be_a_string() -> None:
+    recorder = Recorder(
+        httpx.Response(429, json={"error": {"code": 42}}), httpx.Response(200, json=openai_ok())
+    )
+    assert recorder.provider(OpenAIProvider).read(REQUEST).tags
