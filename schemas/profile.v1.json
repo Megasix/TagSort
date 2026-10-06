@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Megasix/TagSort/main/schemas/profile.v1.json",
+  "title": "TagSort profile",
+  "description": "Describes the identification tags of one collection: what each kind of tag may say. Two rules cannot be expressed in JSON Schema and are checked by TagSort when it loads a profile: tag ids must be unique, and each pattern must follow the regex subset in docs/patterns.md.",
+  "type": "object",
+  "required": ["schema_version", "name", "tags_per_individual", "tags"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Version of this schema the profile follows.",
+      "const": "1.0"
+    },
+    "name": {
+      "description": "Human-readable name of the profile, for example the collection it describes.",
+      "type": "string",
+      "minLength": 1
+    },
+    "tags_per_individual": {
+      "description": "Number of tags attached to one specimen.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "tags": {
+      "description": "The kinds of tag found in this collection.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/tag" }
+    }
+  },
+  "$defs": {
+    "tag": {
+      "type": "object",
+      "required": ["id", "pattern"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Identifier of this kind of tag, reported as tag_id in results. Unique within the profile.",
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+        },
+        "pattern": {
+          "description": "Every text this kind of tag may carry, in the regex subset of docs/patterns.md. Always matched against the whole text.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

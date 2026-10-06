@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Megasix/TagSort/main/schemas/result.v1.json",
+  "title": "TagSort read result",
+  "description": "Every tag TagSort found in one image. Coordinates are in pixels of the original image after EXIF rotation, with the origin at the top-left corner, x to the right and y down.",
+  "type": "object",
+  "required": ["schema_version", "engine_version", "model_version", "image", "tags", "timings_ms"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Version of this schema the result follows.",
+      "const": "1.0"
+    },
+    "engine_version": {
+      "description": "Version of the TagSort engine that produced the result.",
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "description": "Versions of the models used, for example det-1.0+rec-1.0.",
+      "type": "string",
+      "minLength": 1
+    },
+    "image": { "$ref": "#/$defs/image" },
+    "tags": {
+      "description": "Tags found in the image, possibly none.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/tag" }
+    },
+    "timings_ms": {
+      "description": "Time spent in each pipeline stage, in milliseconds.",
+      "type": "object",
+      "propertyNames": { "minLength": 1 },
+      "additionalProperties": { "type": "number", "minimum": 0 }
+    }
+  },
+  "$defs": {
+    "image": {
+      "type": "object",
+      "required": ["width", "height", "exif_rotation"],
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "description": "Width in pixels, after EXIF rotation.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "description": "Height in pixels, after EXIF rotation.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "exif_rotation": {
+          "description": "Clockwise rotation in degrees applied to the stored pixels to honor the EXIF orientation.",
+          "enum": [0, 90, 180, 270]
+        }
+      }
+    },
+    "point": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 2
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["text", "confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "required": [
+        "tag_id",
+        "text",
+        "confidence",
+        "status",
+        "polygon",
+        "angle",
+        "candidates",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tag_id": {
+          "description": "Id of the profile tag this text matches, or null when it matches none.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "text": {
+          "description": "Text read on the tag, or null when the tag is unreadable.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "confidence": {
+          "description": "Calibrated probability that text is exactly right.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "status": {
+          "description": "accepted: confident reading. review: a person should check it. unreadable: no reading.",
+          "enum": ["accepted", "review", "unreadable"]
+        },
+        "polygon": {
+          "description": "Corners of the tag, clockwise, starting at the top-left corner of the upright text.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/point" },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "angle": {
+          "description": "Orientation of the tag text in the image: clockwise rotation in degrees from upright, in [0, 360). 0 means the text reads left to right, 90 top to bottom, 180 upside down.",
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "candidates": {
+          "description": "Other possible readings, most likely first.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/candidate" }
+        },
+        "source": {
+          "description": "local: read by the on-device models. fallback: read by the vision API fallback.",
+          "enum": ["local", "fallback"]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "unreadable" } } },
+          "then": { "properties": { "text": { "type": "null" } } },
+          "else": { "properties": { "text": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "accepted" } } },
+          "then": { "properties": { "tag_id": { "type": "string" } } }
+        }
+      ]
+    }
+  }
+}
