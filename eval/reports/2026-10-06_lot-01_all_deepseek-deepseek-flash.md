@@ -19,7 +19,7 @@
 | Invented tags | 0 |
 | Share read by the fallback | 100% |
 | Time per photo | 3.5 s |
-| Cost per 1,000 photos | unknown |
+| Cost per 1,000 photos | $0.47 |
 
 ## By session
 

@@ -27,8 +27,11 @@ PRICES: dict[str, tuple[float, float]] = {
     "gpt-6-luna": (0.10, 0.50),
     "gemini-3.1-pro-preview": (2.0, 12.0),
     "gemini-3.5-flash-lite": (0.30, 2.50),
+    # Off-peak rate; DeepSeek doubles it at peak hours. Consistent with the invoice of
+    # the lot-01 runs (under 1 cent CAD for about 36,000 tokens).
+    "deepseek-flash": (0.15, 0.60),
 }
-"""USD per million input and output tokens, standard tier."""
+"""USD per million input and output tokens, standard tier, cache misses."""
 
 
 @dataclass(frozen=True)
