@@ -381,3 +381,21 @@ def test_error_code_must_be_a_string() -> None:
         httpx.Response(429, json={"error": {"code": 42}}), httpx.Response(200, json=openai_ok())
     )
     assert recorder.provider(OpenAIProvider).read(REQUEST).tags
+
+
+def test_retry_after_ms_header() -> None:
+    recorder = Recorder(
+        httpx.Response(429, headers={"retry-after-ms": "2500"}),
+        httpx.Response(200, json=openai_ok()),
+    )
+    recorder.provider(OpenAIProvider).read(REQUEST)
+    assert recorder.sleeps == [2.5]
+
+
+def test_rate_limits_without_header_wait_longer() -> None:
+    recorder = Recorder(
+        httpx.Response(429), httpx.Response(429), httpx.Response(200, json=openai_ok())
+    )
+    recorder.provider(OpenAIProvider).read(REQUEST)
+    assert 5 <= recorder.sleeps[0] <= 6
+    assert 10 <= recorder.sleeps[1] <= 11

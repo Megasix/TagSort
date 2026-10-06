@@ -153,7 +153,10 @@ class HttpProvider:
                 delay = _retry_after(response)
             if not failure.retryable or attempt >= self._max_retries:
                 raise failure
-            delay = delay if delay is not None else min(2.0**attempt + random.random(), 30.0)
+            if delay is None:
+                # Rate limits are usually per minute, so wait longer than for server errors.
+                base = 5.0 if failure.reason == "rate_limit" else 1.0
+                delay = min(base * 2.0**attempt + random.random(), _MAX_BACKOFF)
             logger.warning("%s; retrying in %.1f s", failure, delay)
             self._sleep(min(delay, _MAX_BACKOFF))
             attempt += 1
@@ -185,13 +188,16 @@ class HttpProvider:
 
 
 def _retry_after(response: httpx.Response) -> float | None:
-    value = response.headers.get("retry-after")
-    if value is None:
-        return None
-    try:
-        return max(float(value), 0.0)
-    except ValueError:
-        return None
+    """Return the delay the provider asks for, in seconds, if any."""
+    for header, unit in (("retry-after-ms", 0.001), ("retry-after", 1.0)):
+        value = response.headers.get(header)
+        if value is None:
+            continue
+        try:
+            return max(float(value) * unit, 0.0)
+        except ValueError:
+            continue
+    return None
 
 
 def _error_code(response: httpx.Response) -> str | None:
