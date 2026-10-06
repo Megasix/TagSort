@@ -65,6 +65,9 @@ def test_providers_explain_the_missing_extra(monkeypatch: pytest.MonkeyPatch) ->
     for name in list(sys.modules):
         if name.startswith("tagsort.fallback.") and name != "tagsort.fallback.base":
             monkeypatch.delitem(sys.modules, name)
+    # Another test may have left the class cached on the module; drop it so the lazy
+    # import runs again.
+    monkeypatch.delattr(tagsort, "OpenAIProvider", raising=False)
     monkeypatch.setitem(sys.modules, "httpx", None)
     with pytest.raises(ImportError, match=r"tagsort\[api\]"):
         tagsort.OpenAIProvider  # noqa: B018
