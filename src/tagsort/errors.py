@@ -86,9 +86,9 @@ class ProviderError(TagSortError):
 
     Attributes:
         provider: Name of the provider, for example ``anthropic``.
-        reason: Stable identifier of the failure: ``authentication``, ``bad_request``,
-            ``rate_limit``, ``server``, ``network``, ``refused``, ``truncated`` or
-            ``invalid_response``.
+        reason: Stable identifier of the failure: ``authentication``, ``quota`` (no
+            credit left on the account), ``bad_request``, ``rate_limit``, ``server``,
+            ``network``, ``refused``, ``truncated`` or ``invalid_response``.
         status_code: HTTP status code, when the provider answered with an error.
         retryable: Whether retrying the same request later may succeed.
     """
