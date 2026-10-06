@@ -59,7 +59,7 @@ If a task touches any of these, stop and ask.
 
 | Item | Choice |
 | --- | --- |
-| Language | Python ≥ 3.10, fully typed |
+| Language | Python ≥ 3.11, fully typed |
 | Project management | `uv`, `pyproject.toml` (`hatchling` build backend) |
 | Quality | `ruff` (lint and format), `mypy --strict`, `pytest`, `pytest-cov` |
 | Inference | `onnxruntime`, `numpy`, `pillow` |

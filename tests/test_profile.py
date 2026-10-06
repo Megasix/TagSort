@@ -148,7 +148,8 @@ def test_from_json_accepts_bytes() -> None:
 
 
 def test_invalid_json_reports_line_and_column() -> None:
-    with pytest.raises(ProfileError, match="line 2, column 1"):
+    # The exact position differs between Python versions; it must be reported.
+    with pytest.raises(ProfileError, match=r"invalid JSON at line \d+, column \d+"):
         Profile.from_json('{"name": "A",\n}')
 
 
