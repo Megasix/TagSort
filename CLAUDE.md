@@ -51,6 +51,8 @@ These belong to the applications, not to TagSort:
 - accounts, credits, billing;
 - review user interface.
 
+Exception, approved by the maintainer: `tagsort-eval prelabel` writes a plain, local HTML page to check and correct AI pre-labels when building evaluation and training datasets. It is a development and training tool only: no styling effort, never shipped as an application feature, never a substitute for the applications' review screens.
+
 If a task touches any of these, stop and ask.
 
 ## 5. Required stack

@@ -61,7 +61,8 @@ class LabeledImage:
 def load_dataset(folder: str | Path, *, split: str | None = None) -> list[LabeledImage]:
     """Load the labeled photos of ``folder``, optionally keeping one split.
 
-    Photos without labels, and labels still holding the ``A_REMPLIR`` placeholder, are
+    Photos without labels, labels still holding the ``A_REMPLIR`` placeholder, and, when
+    the labels have a ``verified`` column, photos with any row not marked verified, are
     left out. Images are listed in file name order.
 
     Raises:
@@ -81,10 +82,14 @@ def load_dataset(folder: str | Path, *, split: str | None = None) -> list[Labele
 
     images: dict[str, dict[str, object]] = {}
     session_splits: dict[str, str | None] = {}
+    unverified: set[str] = set()
     for where, record in records:
         name = record.get("image")
         if not isinstance(name, str) or not name:
             raise DatasetError(f"{where}: image is missing")
+        if "verified" in record and not _is_yes(record["verified"]):
+            # Pre-labeled but not checked by a person yet: the whole photo waits.
+            unverified.add(name)
         if not (photos / name).is_file():
             raise DatasetError(f"{where}: photo {name!r} not found in {photos}")
         session = str(record.get("session") or "")
@@ -112,8 +117,14 @@ def load_dataset(folder: str | Path, *, split: str | None = None) -> list[Labele
             tags=tuple(entry["tags"]),  # type: ignore[arg-type]
         )
         for name, entry in sorted(images.items())
-        if split is None or entry["split"] == split
+        if name not in unverified and (split is None or entry["split"] == split)
     ]
+
+
+def _is_yes(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    return isinstance(value, str) and value.strip().lower() in {"yes", "oui", "y", "x", "1", "true"}
 
 
 def _tag(record: dict[str, object], where: str) -> LabeledTag | None:
