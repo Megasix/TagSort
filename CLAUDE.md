@@ -65,7 +65,7 @@ If a task touches any of these, stop and ask.
 | CI | GitHub Actions: lint, type check, tests, license check, engine evaluation |
 | License | Apache 2.0 |
 
-Ask before adding any dependency, and state its license. AGPL and GPL are rejected (known case: Ultralytics YOLO is AGPL). Accepted licenses: MIT, BSD, Apache 2.0, ISC, PSF, and MPL 2.0 for unmodified dependencies only (for example `certifi`). CI fails if a runtime or extra dependency falls outside this list; dev-only tools are not distributed and are not checked.
+Ask before adding any dependency, and state its license. AGPL and GPL are rejected (known case: Ultralytics YOLO is AGPL). Accepted licenses: MIT, MIT-CMU and HPND (for example Pillow), BSD, Apache 2.0, ISC, PSF, Zlib, CC0 1.0 (parts of numpy), and MPL 2.0 for unmodified dependencies only (for example `certifi`). Claude may add another permissive license to this list without asking, and reports it; copyleft licenses and licenses with use restrictions always need the maintainer's approval. CI fails if a runtime or extra dependency falls outside this list; dev-only tools are not distributed and are not checked.
 
 ## 6. Environment setup
 

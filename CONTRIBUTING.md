@@ -75,9 +75,9 @@ that ships to users must be compatible.
 
 | Status | Licenses |
 | --- | --- |
-| Accepted | MIT, BSD, Apache 2.0, ISC, PSF |
+| Accepted | MIT, MIT-CMU, HPND, BSD, Apache 2.0, ISC, PSF, Zlib, CC0 1.0 |
 | Accepted, unmodified only | MPL 2.0 (for example `certifi`) |
-| Rejected | GPL, AGPL, LGPL, SSPL and any other license not listed above |
+| Rejected | GPL, AGPL, LGPL, SSPL, non-commercial or use-restricted licenses, and any other license not listed above until reviewed |
 
 - Open an issue before adding a dependency, a pretrained model or an API provider, and state its
   license.
