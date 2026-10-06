@@ -190,3 +190,52 @@ def test_reader_validation() -> None:
     with pytest.raises(ValueError, match="thresholds"):
         Reader(PROFILE, backend=FakeProvider(), accept_threshold=0.2, review_threshold=0.5)
     assert Reader(PROFILE, backend=FakeProvider()).profile is PROFILE
+
+
+def test_digits_that_read_differently_upside_down_need_review() -> None:
+    profile = Profile.from_dict(
+        {
+            "schema_version": "1.0",
+            "name": "Digits",
+            "tags_per_individual": 1,
+            "tags": [{"id": "number", "pattern": "\\d{4}"}],
+        }
+    )
+    (tag,) = Reader(profile, backend=FakeProvider(tags=(raw("9800"),))).read(make_image()).tags
+    assert tag.status == "review"
+    assert tag.text == "9800"
+    assert [c.text for c in tag.candidates] == ["0086"]
+
+
+@pytest.mark.parametrize("text", ["GJ07966", "8008", "1001"])
+def test_readings_without_a_different_upside_down_reading_are_kept(text: str) -> None:
+    profile = Profile.from_dict(
+        {
+            "schema_version": "1.0",
+            "name": "Mixed",
+            "tags_per_individual": 1,
+            "tags": [{"id": "number", "pattern": "\\d{4}"}, {"id": "code", "pattern": "GJ\\d{5}"}],
+        }
+    )
+    (tag,) = Reader(profile, backend=FakeProvider(tags=(raw(text),))).read(make_image()).tags
+    assert tag.status == "accepted"
+
+
+def test_upside_down_reading_outside_the_profile_is_ignored() -> None:
+    # "MOS" upside down is "SOW", which does not fit the museum_a profile.
+    (tag,) = read(raw("MD04127", alternatives=())).tags
+    assert tag.status == "accepted"
+
+
+def test_upside_down_reading_already_listed_is_not_duplicated() -> None:
+    profile = Profile.from_dict(
+        {
+            "schema_version": "1.0",
+            "name": "Digits",
+            "tags_per_individual": 1,
+            "tags": [{"id": "number", "pattern": "\\d{4}"}],
+        }
+    )
+    provider = FakeProvider(tags=(raw("9800", "uncertain", ("0086",)),))
+    (tag,) = Reader(profile, backend=provider).read(make_image()).tags
+    assert [c.text for c in tag.candidates] == ["0086"]

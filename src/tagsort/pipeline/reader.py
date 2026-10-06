@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterable, Iterator
+from dataclasses import replace
 
 from tagsort._version import __version__
 from tagsort.fallback.base import ProviderTag, VisionProvider, VisionRequest
@@ -114,6 +115,7 @@ class Reader:
             yield self.read(image)
 
     def _to_tag(self, raw: ProviderTag, prepared: PreparedImage) -> Tag:
+        raw = self._flag_upside_down_ambiguity(raw)
         readings = [raw.text, *raw.alternatives] if raw.text else list(raw.alternatives)
         scored = [(text, self._score(raw, index, text)) for index, text in enumerate(readings)]
         if raw.legibility == "unreadable":
@@ -146,6 +148,21 @@ class Reader:
             source="fallback",
         )
 
+    def _flag_upside_down_ambiguity(self, raw: ProviderTag) -> ProviderTag:
+        r"""Mark a reading uncertain when the tag read upside down also fits the profile.
+
+        "0086" upside down reads "9800": both fit ``\d{4}``, so the orientation the
+        provider chose decides the text, and a wrong guess would be accepted silently.
+        """
+        flipped = _upside_down(raw.text)
+        if flipped is None or flipped == raw.text or self._profile.match(flipped) is None:
+            return raw
+        alternatives = raw.alternatives
+        if flipped not in alternatives:
+            alternatives = (*alternatives, flipped)
+        legibility = "uncertain" if raw.legibility == "certain" else raw.legibility
+        return replace(raw, legibility=legibility, alternatives=alternatives)
+
     def _score(self, raw: ProviderTag, index: int, text: str) -> float:
         if self._profile.match(text) is None:
             return _NOT_VALID * (0.9**index)
@@ -159,6 +176,29 @@ class Reader:
         if confidence >= self._review:
             return "review"
         return "unreadable"
+
+
+# Characters that read as another valid character when turned upside down (180°).
+_UPSIDE_DOWN = {
+    **{c: c for c in "018HINOSXZlosxz-/ "},
+    "6": "9",
+    "9": "6",
+    "M": "W",
+    "W": "M",
+    "b": "q",
+    "q": "b",
+    "d": "p",
+    "p": "d",
+    "n": "u",
+    "u": "n",
+}
+
+
+def _upside_down(text: str) -> str | None:
+    """Return ``text`` as it reads turned 180°, or ``None`` if some character cannot."""
+    if not text or any(char not in _UPSIDE_DOWN for char in text):
+        return None
+    return "".join(_UPSIDE_DOWN[char] for char in reversed(text))
 
 
 def _polygon(
