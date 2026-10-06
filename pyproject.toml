@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Barry Lawson" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "pillow>=11",
 ]
@@ -21,9 +21,9 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Image Recognition",
     "Typing :: Typed",
 ]
@@ -79,7 +79,7 @@ include = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 src = ["src", "tests"]
 # Code samples in CLAUDE.md are illustrative and aligned by hand.
 extend-exclude = ["CLAUDE.md"]
@@ -118,7 +118,7 @@ docstring-code-format = true
 
 [tool.mypy]
 strict = true
-python_version = "3.10"
+python_version = "3.11"
 files = ["src", "tests", ".github/scripts"]
 warn_unreachable = true
 

@@ -22,7 +22,7 @@ environment, which checks must pass, and the rules every contribution follows.
 2. Install the Python versions we test against:
 
    ```sh
-   uv python install 3.10 3.11 3.12
+   uv python install 3.11 3.12 3.13
    ```
 
 3. Clone the repository and install all extras and dev tools into `.venv/`:
@@ -53,7 +53,7 @@ CI also checks the licenses of runtime dependencies and extras (see
 To run the tests on another supported Python version without touching `.venv/`:
 
 ```sh
-uv run --isolated --python 3.10 --all-extras pytest
+uv run --isolated --python 3.11 --all-extras pytest
 ```
 
 Tests come first for the grammar, constrained decoding, calibration and schema conformance.

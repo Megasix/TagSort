@@ -96,7 +96,7 @@ without reading the Python code:
 
 ## Development setup
 
-TagSort uses [uv](https://docs.astral.sh/uv/) and supports Python 3.10 and later.
+TagSort uses [uv](https://docs.astral.sh/uv/) and supports Python 3.11 and later.
 
 ```sh
 uv python install 3.12
