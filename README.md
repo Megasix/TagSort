@@ -7,8 +7,38 @@ Open-source engine that reads handwritten or printed specimen ID tags in photos,
 
 ## Status
 
-Early development. Profiles, result types and their JSON Schemas are in place; reading images
-comes in the next milestones.
+Early development. Tags can be read through a vision API (Anthropic, OpenAI or Google); the
+on-device models come in a later milestone. Confidence scores are provisional until they are
+calibrated on labeled data.
+
+## Reading tags
+
+Reading through a vision API needs the `api` extra:
+
+```sh
+pip install "tagsort[api]"
+```
+
+```python
+import os
+
+from tagsort import AnthropicProvider, Profile, Reader
+
+profile = Profile.from_file("museum_a.json")
+provider = AnthropicProvider(api_key=os.environ["ANTHROPIC_API_KEY"])
+reader = Reader(profile, backend=provider)
+
+result = reader.read("IMG_0412.jpg")  # path, bytes, PIL image or array
+for tag in result.tags:
+    print(tag.tag_id, tag.text, tag.confidence, tag.status)
+
+print(result.to_json(indent=2))  # conforms to schemas/result.v1.json
+```
+
+`OpenAIProvider` and `GeminiProvider` work the same way. The API key always comes from your
+application. Each photo is sent whole to the provider, upright, downscaled and stripped of
+EXIF and GPS metadata. A reading is `accepted` only if it matches a pattern of the profile;
+everything else is marked `review` or `unreadable` so a person can check it.
 
 ## Profiles
 
