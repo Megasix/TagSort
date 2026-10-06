@@ -1,0 +1,124 @@
+# --- Images: no photo ever enters the repository (CLAUDE.md §11) ---
+# Linux file systems are case-sensitive, so extensions are matched in any case.
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[jJ][pP][eE]
+*.[pP][nN][gG]
+*.[gG][iI][fF]
+*.[bB][mM][pP]
+*.[wW][eE][bB][pP]
+*.[hH][eE][iI][cC]
+*.[hH][eE][iI][fF]
+*.[aA][vV][iI][fF]
+*.[tT][iI][fF]
+*.[tT][iI][fF][fF]
+*.[jJ][fF][iI][fF]
+*.[jJ][xX][lL]
+*.[jJ][pP]2
+*.[jJ]2[kK]
+*.[jJ][pP][xX]
+*.[pP][sS][dD]
+# Camera raw formats
+*.[rR][aA][wW]
+*.[dD][nN][gG]
+*.[cC][rR]2
+*.[cC][rR]3
+*.[cC][rR][wW]
+*.[nN][eE][fF]
+*.[nN][rR][wW]
+*.[aA][rR][wW]
+*.[sS][rR][fF]
+*.[sS][rR]2
+*.[oO][rR][fF]
+*.[rR][wW]2
+*.[rR][aA][fF]
+*.[pP][eE][fF]
+*.[sS][rR][wW]
+*.3[fF][rR]
+*.[eE][rR][fF]
+*.[kK][dD][cC]
+*.[mM][rR][wW]
+*.[xX]3[fF]
+*.[iI][iI][qQ]
+
+# --- Datasets ---
+# Matched at any depth and in any case.
+[dD][aA][tT][aA]/
+[dD][aA][tT][aA][sS][eE][tT][sS]/
+# Package data and test fixtures are code, not datasets. Image and weight rules still apply.
+!src/tagsort/**/data/
+!tests/**/data/
+
+# --- Model weights and checkpoints ---
+*.onnx
+*.ort
+*.pt
+*.pth
+*.ckpt
+*.tflite
+*.lite
+*.safetensors
+*.h5
+*.keras
+*.pb
+*.bin
+*.npz
+*.mlmodel
+*.mlpackage/
+runs/
+checkpoints/
+wandb/
+mlruns/
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+secrets/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# --- Virtual environments ---
+.venv/
+/venv/
+/env/
+/ENV/
+
+# --- Tool caches and reports ---
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.tox/
+.nox/
+.ipynb_checkpoints/
+
+# --- Editors and OS ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# --- Claude Code local settings ---
+.claude/settings.local.json
