@@ -6,7 +6,14 @@ from typing import Any
 import httpx
 import pytest
 
-from tagsort import AnthropicProvider, GeminiProvider, OpenAIProvider, ProviderError, VisionProvider
+from tagsort import (
+    AnthropicProvider,
+    DeepSeekProvider,
+    GeminiProvider,
+    OpenAIProvider,
+    ProviderError,
+    VisionProvider,
+)
 from tagsort.fallback._http import HttpProvider
 from tagsort.fallback.base import VisionRequest
 from tagsort.fallback.prompt import ANSWER_SCHEMA
@@ -76,7 +83,18 @@ def gemini_ok(text: str = json.dumps(ANSWER), **changes: Any) -> dict[str, Any]:
     return body
 
 
+def deepseek_ok(text: str = json.dumps(ANSWER), **changes: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "model": "deepseek-flash",
+        "choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": text}}],
+        "usage": {"prompt_tokens": 900, "completion_tokens": 70},
+    }
+    body.update(changes)
+    return body
+
+
 PROVIDERS: dict[str, tuple[type[HttpProvider], Callable[..., dict[str, Any]]]] = {
+    "deepseek": (DeepSeekProvider, deepseek_ok),
     "anthropic": (AnthropicProvider, anthropic_ok),
     "openai": (OpenAIProvider, openai_ok),
     "gemini": (GeminiProvider, gemini_ok),
@@ -195,6 +213,29 @@ def test_gemini_request_shape() -> None:
     assert answer.usage.output_tokens == 80
 
 
+def test_deepseek_request_shape() -> None:
+    recorder = Recorder(httpx.Response(200, json=deepseek_ok()))
+    answer = recorder.provider(DeepSeekProvider).read(REQUEST)
+    request = recorder.requests[0]
+    assert str(request.url) == "https://api.deepseek.com/chat/completions"
+    assert request.headers["authorization"] == f"Bearer {KEY}"
+    body = recorder.body()
+    assert body["response_format"] == {"type": "json_object"}
+    text, image = body["messages"][0]["content"]
+    assert text["text"].startswith("Read the tags.")
+    assert '"legibility"' in text["text"], "the schema is spelled out in the prompt"
+    assert image["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    (tag,) = answer.tags
+    assert tag.box == (100.0, 200.0, 300.0, 400.0)
+
+
+def test_anthropic_image_size_depends_on_model() -> None:
+    assert AnthropicProvider(api_key=KEY).max_side == 2576
+    assert AnthropicProvider(api_key=KEY, model="claude-sonnet-5-5").max_side == 2576
+    assert AnthropicProvider(api_key=KEY, model="claude-haiku-4-5").max_side == 1568
+    assert AnthropicProvider(api_key=KEY, model="claude-haiku-4-5", max_side=800).max_side == 800
+
+
 REFUSALS = {
     "anthropic": [anthropic_ok(stop_reason="refusal", content=[])],
     "openai": [
@@ -206,12 +247,22 @@ REFUSALS = {
         gemini_ok(candidates=[{"finishReason": "PROHIBITED_CONTENT"}]),
     ],
 }
+REFUSALS["deepseek"] = [
+    deepseek_ok(choices=[{"finish_reason": "content_filter", "message": {}}]),
+    deepseek_ok(choices=[{"finish_reason": "stop", "message": {"refusal": "no", "content": ""}}]),
+]
 TRUNCATIONS = {
+    "deepseek": [deepseek_ok(choices=[{"finish_reason": "length", "message": {}}])],
     "anthropic": [anthropic_ok(stop_reason="max_tokens")],
     "openai": [openai_ok(status="incomplete", incomplete_details={"reason": "max_output_tokens"})],
     "gemini": [gemini_ok(candidates=[{"finishReason": "MAX_TOKENS"}])],
 }
 MALFORMED = {
+    "deepseek": [
+        deepseek_ok(choices=[]),
+        deepseek_ok(choices=[{"finish_reason": "stop"}]),
+        deepseek_ok(choices=[{"finish_reason": "stop", "message": {"content": " "}}]),
+    ],
     "anthropic": [anthropic_ok(content=[]), anthropic_ok(content=None), anthropic_ok(text="{}")],
     "openai": [
         openai_ok(output=[]),

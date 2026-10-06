@@ -10,6 +10,16 @@ from tagsort.fallback.base import BoxFormat, Usage, VisionRequest
 
 __all__ = ["AnthropicProvider"]
 
+# Model families that read images up to 2576 px with 1:1 pixel coordinates.
+_HIGH_RES = (
+    "claude-fable",
+    "claude-mythos",
+    "claude-opus-5",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-sonnet-5",
+)
+
 # Models that accept server-side refusal fallbacks with the "default" routing.
 _FALLBACK_MODELS = frozenset({"claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"})
 
@@ -24,10 +34,18 @@ class AnthropicProvider(HttpProvider):
     name = "anthropic"
     box_format: BoxFormat = "pixels_xyxy"
     default_model = "claude-opus-5-5"
-    # Current models read up to 2576 px on the long edge and report pixel coordinates
-    # 1:1 with the image sent.
+    # Recent models read up to 2576 px on the long edge and report pixel coordinates 1:1
+    # with the image sent; older ones (Haiku 4.5, Opus 4.6...) downscale beyond 1568 px.
     default_max_side = 2576
+    legacy_max_side = 1568
     url = "https://api.anthropic.com/v1/messages"
+
+    @property
+    def max_side(self) -> int:
+        """Longest image edge sent: 2576 px for high-resolution models, else 1568 px."""
+        if self._max_side != self.default_max_side or self._model.startswith(_HIGH_RES):
+            return self._max_side
+        return self.legacy_max_side
 
     def _build(
         self, request: VisionRequest, image_base64: str

@@ -1,8 +1,8 @@
 """TagSort: read specimen ID tags in photos.
 
 Only names exported from this module are part of the public API. The vision API
-providers (``AnthropicProvider``, ``GeminiProvider``, ``OpenAIProvider``) need the
-``api`` extra: ``pip install "tagsort[api]"``.
+providers (``AnthropicProvider``, ``DeepSeekProvider``, ``GeminiProvider``,
+``OpenAIProvider``) need the ``api`` extra: ``pip install "tagsort[api]"``.
 """
 
 from __future__ import annotations
@@ -19,12 +19,14 @@ from tagsort.types import Candidate, ImageInfo, Point, ReadResult, Tag, TagSourc
 
 if TYPE_CHECKING:
     from tagsort.fallback.anthropic import AnthropicProvider
+    from tagsort.fallback.deepseek import DeepSeekProvider
     from tagsort.fallback.gemini import GeminiProvider
     from tagsort.fallback.openai import OpenAIProvider
 
 __all__ = [
     "AnthropicProvider",
     "Candidate",
+    "DeepSeekProvider",
     "GeminiProvider",
     "ImageError",
     "ImageInfo",
@@ -53,6 +55,7 @@ logging.getLogger("tagsort").addHandler(logging.NullHandler())
 
 _PROVIDERS = {
     "AnthropicProvider": "tagsort.fallback.anthropic",
+    "DeepSeekProvider": "tagsort.fallback.deepseek",
     "GeminiProvider": "tagsort.fallback.gemini",
     "OpenAIProvider": "tagsort.fallback.openai",
 }

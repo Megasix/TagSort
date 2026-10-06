@@ -9,13 +9,15 @@ Dataset layout (kept outside the repository):
     <dataset>/labels.csv        image,session,tag_id,text,notes (one row per tag)
     <dataset>/profile.json      the profile, following schemas/profile.v1.json
 
-API keys are read from the environment: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY.
+API keys are read from the environment: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY,
+DEEPSEEK_API_KEY.
 
 Usage:
 
     uv run python eval/try_batch.py <dataset> --check
     uv run python eval/try_batch.py <dataset> --provider anthropic --limit 5
     uv run python eval/try_batch.py <dataset> --provider anthropic openai gemini
+    uv run python eval/try_batch.py <dataset> --provider anthropic --model claude-haiku-4-5
 
 Results are written to <dataset>/results/<provider>/<image>.json.
 """
@@ -34,6 +36,7 @@ import httpx
 
 from tagsort import (
     AnthropicProvider,
+    DeepSeekProvider,
     GeminiProvider,
     OpenAIProvider,
     Profile,
@@ -52,14 +55,19 @@ PROVIDERS: dict[str, tuple[type[HttpProvider], str]] = {
     "anthropic": (AnthropicProvider, "ANTHROPIC_API_KEY"),
     "openai": (OpenAIProvider, "OPENAI_API_KEY"),
     "gemini": (GeminiProvider, "GEMINI_API_KEY"),
+    "deepseek": (DeepSeekProvider, "DEEPSEEK_API_KEY"),
 }
 
 # USD per million input and output tokens, from the providers' pricing pages on
 # 2026-10-06. Check them before relying on the cost estimate.
 PRICES: dict[str, tuple[float, float]] = {
     "claude-opus-5-5": (4.0, 20.0),
+    "claude-sonnet-5-5": (2.0, 10.0),
+    "claude-haiku-4-5": (1.0, 5.0),
     "gpt-6.1-sol": (2.0, 10.0),
+    "gpt-6-luna": (0.10, 0.50),
     "gemini-3.1-pro-preview": (2.0, 12.0),
+    "gemini-3.5-flash-lite": (0.30, 2.50),
 }
 
 PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
@@ -128,6 +136,7 @@ def check_models() -> int:
         "anthropic": "https://api.anthropic.com/v1/models?limit=1000",
         "openai": "https://api.openai.com/v1/models",
         "gemini": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+        "deepseek": "https://api.deepseek.com/models",
     }
     status = 0
     for name, (cls, variable) in PROVIDERS.items():
@@ -139,6 +148,7 @@ def check_models() -> int:
             "anthropic": {"x-api-key": key, "anthropic-version": "2023-06-01"},
             "openai": {"Authorization": f"Bearer {key}"},
             "gemini": {"x-goog-api-key": key},
+            "deepseek": {"Authorization": f"Bearer {key}"},
         }[name]
         try:
             response = httpx.get(urls[name], headers=headers, timeout=30)
@@ -151,15 +161,17 @@ def check_models() -> int:
         ids = {
             str(item.get("id") or item.get("name", "")).removeprefix("models/") for item in items
         }
-        found = cls.default_model in ids
-        print(f"{name}: default model {cls.default_model} {'available' if found else 'NOT FOUND'}")
-        if not found:
+        family = {"anthropic": "claude", "openai": "gpt", "gemini": "gemini"}.get(name, name)
+        wanted = [cls.default_model, *(m for m in PRICES if m.startswith(family))]
+        for model in dict.fromkeys(wanted):
+            print(f"{name}: {model} {'available' if model in ids else 'NOT FOUND'}")
+        if cls.default_model not in ids:
             status = 1
             print("  available:", ", ".join(sorted(ids)[:40]))
     return status
 
 
-def run(dataset: Path, provider_name: str, limit: int | None) -> None:
+def run(dataset: Path, provider_name: str, limit: int | None, model: str | None) -> None:
     cls, variable = PROVIDERS[provider_name]
     key = os.environ.get(variable)
     if not key:
@@ -169,10 +181,10 @@ def run(dataset: Path, provider_name: str, limit: int | None) -> None:
     photos = sorted(
         p for p in (dataset / "photos").iterdir() if p.suffix.lower() in PHOTO_SUFFIXES
     )[:limit]
-    output = dataset / "results" / provider_name
+    output = dataset / "results" / f"{provider_name}-{model or cls.default_model}"
     output.mkdir(parents=True, exist_ok=True)
 
-    provider = Counting(cls(api_key=key))
+    provider = Counting(cls(api_key=key, model=model))
     reader = Reader(profile, backend=provider)
     expected = found = silent = unlabeled = failed = 0
     statuses: dict[str, int] = defaultdict(int)
@@ -218,7 +230,10 @@ def run(dataset: Path, provider_name: str, limit: int | None) -> None:
     print(f"  statuses: {dict(statuses)}; failed photos: {failed}; unlabeled: {unlabeled}")
     print(f"  tokens: {provider.input_tokens} in, {provider.output_tokens} out")
     if read_count and price_in:
-        print(f"  cost: ${cost:.3f}, about ${cost / read_count * 1000:.0f} per 1,000 photos")
+        per_thousand = cost / read_count * 1000
+        print(f"  cost: ${cost:.3f}, about ${per_thousand:.2f} per 1,000 photos")
+    elif read_count:
+        print(f"  cost: price of {provider.model} unknown, see the provider's pricing page")
     print(f"  results: {output}")
 
 
@@ -227,14 +242,17 @@ def main() -> None:
     parser.add_argument("dataset", type=Path)
     parser.add_argument("--provider", nargs="+", choices=sorted(PROVIDERS), default=[])
     parser.add_argument("--limit", type=int, default=None, help="read only the first N photos")
-    parser.add_argument("--check", action="store_true", help="check the default models exist")
+    parser.add_argument("--model", help="model to use instead of the provider's default")
+    parser.add_argument("--check", action="store_true", help="check the models exist")
     args = parser.parse_args()
     if args.check:
         sys.exit(check_models())
     if not args.provider:
         parser.error("give --provider or --check")
+    if args.model and len(args.provider) > 1:
+        parser.error("--model needs exactly one --provider")
     for name in args.provider:
-        run(args.dataset, name, args.limit)
+        run(args.dataset, name, args.limit, args.model)
 
 
 if __name__ == "__main__":
