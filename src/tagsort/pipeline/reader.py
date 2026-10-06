@@ -2,20 +2,29 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import deque
 from collections.abc import Generator, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
+from typing import Literal
 
 from tagsort._version import __version__
+from tagsort.errors import ProviderError
 from tagsort.fallback.base import ProviderTag, VisionProvider, VisionRequest
 from tagsort.fallback.prompt import ANSWER_SCHEMA, build_instructions
+from tagsort.pipeline.local import LineReading, LocalPipeline, score
 from tagsort.pipeline.preprocess import ImageSource, PreparedImage, encode_jpeg, prepare
 from tagsort.profile import Profile
 from tagsort.types import Candidate, ImageInfo, Point, ReadResult, Tag, TagStatus
 
 __all__ = ["Reader"]
+
+logger = logging.getLogger("tagsort")
+
+LOCAL_MAX_SIDE = 4096
+"""Longest side kept for the local pipeline; crops are cut from this image."""
 
 # Provisional confidence scores, used until calibration lands (M3/M4). They only order
 # readings by how much evidence supports them; they are not probabilities yet.
@@ -34,32 +43,54 @@ class Reader:
 
     Args:
         profile: What the tags of the collection may say.
-        backend: The vision API provider that finds and reads tags.
+        backend: ``"local"`` (the default) reads on the device with the default
+            downloaded model; a :class:`LocalPipeline` chooses another model; a vision
+            API provider sends each whole photo to that API instead.
+        fallback: With a local backend, a vision API provider that reads again, from the
+            crop of the tag only, every tag the local pipeline does not accept. Off by
+            default; the photo itself never leaves the device.
         accept_threshold: Minimum confidence for the ``accepted`` status.
         review_threshold: Minimum confidence for the ``review`` status; readings below it
             are ``unreadable`` and kept only as candidates.
 
     Raises:
-        ValueError: If the thresholds are not ``0 <= review <= accept <= 1``.
+        ValueError: If the thresholds are not ``0 <= review <= accept <= 1``, or a
+            fallback is given with an API backend.
+        ModelError: If the local model is not downloaded.
     """
 
     def __init__(
         self,
         profile: Profile,
         *,
-        backend: VisionProvider,
+        backend: VisionProvider | LocalPipeline | Literal["local"] = "local",
+        fallback: VisionProvider | None = None,
         accept_threshold: float = 0.9,
         review_threshold: float = 0.25,
     ) -> None:
         """Create the reader."""
         if not isinstance(profile, Profile):
             raise TypeError(f"profile must be a Profile, not {type(profile).__name__}")
-        if not isinstance(backend, VisionProvider):
-            raise TypeError(f"backend must be a VisionProvider, not {type(backend).__name__}")
         if not 0 <= review_threshold <= accept_threshold <= 1:
             raise ValueError("thresholds must satisfy 0 <= review <= accept <= 1")
+        if fallback is not None and not isinstance(fallback, VisionProvider):
+            raise TypeError(f"fallback must be a VisionProvider, not {type(fallback).__name__}")
+        self._local: LocalPipeline | None = None
+        self._backend: VisionProvider | None = None
+        if backend == "local":
+            self._local = LocalPipeline()
+        elif isinstance(backend, LocalPipeline):
+            self._local = backend
+        elif isinstance(backend, VisionProvider):
+            if fallback is not None:
+                raise ValueError("a fallback is only used with the local backend")
+            self._backend = backend
+        else:
+            raise TypeError(
+                f"backend must be 'local', a LocalPipeline or a VisionProvider, not {backend!r}"
+            )
+        self._fallback = fallback
         self._profile = profile
-        self._backend = backend
         self._accept = accept_threshold
         self._review = review_threshold
 
@@ -78,6 +109,9 @@ class Reader:
             ImageError: If the image cannot be decoded.
             ProviderError: If the vision API fails or returns an unusable answer.
         """
+        if self._local is not None:
+            return self._read_local(image, self._local)
+        assert self._backend is not None
         start = time.perf_counter()
         prepared = prepare(image, max_side=self._backend.max_side)
         working = prepared.image
@@ -143,6 +177,108 @@ class Reader:
             finally:
                 for future in pending:
                     future.cancel()
+
+    def _read_local(self, image: ImageSource, local: LocalPipeline) -> ReadResult:
+        start = time.perf_counter()
+        prepared = prepare(image, max_side=LOCAL_MAX_SIDE)
+        prepared_at = time.perf_counter()
+        lines = local.read(prepared.image, self._profile)
+        read_at = time.perf_counter()
+        tags = []
+        fallback_seconds = 0.0
+        used_fallback = False
+        for line in lines:
+            tag = self._local_tag(line, prepared)
+            if tag.status != "accepted" and self._fallback is not None:
+                asked = time.perf_counter()
+                tag = self._ask_fallback(self._fallback, line, prepared, tag)
+                fallback_seconds += time.perf_counter() - asked
+                used_fallback = True
+            tags.append(tag)
+        timings = {
+            "preprocess": round((prepared_at - start) * 1000, 1),
+            "local": round((read_at - prepared_at) * 1000, 1),
+        }
+        model_version = f"local:{local.model}-{local.version}"
+        if used_fallback and self._fallback is not None:
+            timings["fallback"] = round(fallback_seconds * 1000, 1)
+            model_version += f"+{self._fallback.name}:{self._fallback.model}"
+        return ReadResult(
+            engine_version=__version__,
+            model_version=model_version,
+            image=ImageInfo(prepared.width, prepared.height, prepared.exif_rotation),
+            tags=tuple(tags),
+            timings_ms=timings,
+        )
+
+    def _local_tag(self, line: LineReading, prepared: PreparedImage) -> Tag:
+        text, probability, tag_id = line.readings[0]
+        confidence = score(probability, line.agrees)
+        others = [(t, p) for t, p, _ in line.readings[1:]]
+        flipped = _upside_down(text)
+        if flipped is not None and flipped != text and self._profile.match(flipped) is not None:
+            # Same rule as for API readings: an orientation guess must not decide alone.
+            confidence = min(confidence, _UNCERTAIN_AND_VALID)
+            if flipped not in {t for t, _ in others}:
+                others.append((flipped, 0.0))
+        status = self._status(confidence)
+        best: str | None = text
+        if status == "unreadable":
+            others.insert(0, (text, probability))
+            best = None
+        ceiling = confidence if best is not None else 1.0
+        candidates = sorted(
+            (Candidate(t, round(min(p, ceiling), 4)) for t, p in others),
+            key=lambda candidate: -candidate.confidence,
+        )
+        return Tag(
+            tag_id=tag_id if best is not None else self._profile.match(text),
+            text=best,
+            confidence=round(confidence, 4) if best is not None else 0.0,
+            status=status,
+            polygon=_scale(line.quad, prepared.scale),
+            angle=round(line.angle, 1) % 360,
+            candidates=tuple(candidates),
+            source="local",
+        )
+
+    def _ask_fallback(
+        self, provider: VisionProvider, line: LineReading, prepared: PreparedImage, local: Tag
+    ) -> Tag:
+        """Read the tag again from its crop alone; keep the local tag if that fails."""
+        crop = line.crop.copy()
+        crop.thumbnail((provider.max_side, provider.max_side))
+        request = VisionRequest(
+            jpeg=encode_jpeg(crop),
+            width=crop.width,
+            height=crop.height,
+            instructions=build_instructions(
+                self._profile, box_format=provider.box_format, width=crop.width, height=crop.height
+            ),
+            schema=ANSWER_SCHEMA,
+        )
+        try:
+            answer = provider.read(request)
+        except ProviderError as error:
+            logger.warning("fallback failed, keeping the local reading: %s", error)
+            return local
+        valid = [raw for raw in answer.tags if self._profile.match(raw.text) is not None]
+        if not valid:
+            return local
+        raw = max(valid, key=lambda r: r.legibility == "certain")
+        tag = self._to_tag(raw, prepared)
+        local_texts = [local.text, *(c.text for c in local.candidates)]
+        candidates = [
+            Candidate(t, round(min(0.05, tag.confidence), 4))
+            for t in local_texts
+            if t is not None and t != tag.text
+        ]
+        return replace(
+            tag,
+            polygon=local.polygon,
+            angle=local.angle,
+            candidates=tuple(sorted({*tag.candidates, *candidates}, key=lambda c: -c.confidence)),
+        )
 
     def _to_tag(self, raw: ProviderTag, prepared: PreparedImage) -> Tag:
         raw = self._flag_upside_down_ambiguity(raw)
@@ -229,6 +365,14 @@ def _upside_down(text: str) -> str | None:
     if not text or any(char not in _UPSIDE_DOWN for char in text):
         return None
     return "".join(_UPSIDE_DOWN[char] for char in reversed(text))
+
+
+def _scale(
+    quad: tuple[tuple[float, float], ...], scale: float
+) -> tuple[Point, Point, Point, Point]:
+    """Corners in original pixels, rounded to a tenth of a pixel."""
+    points = [(round(x * scale, 1), round(y * scale, 1)) for x, y in quad]
+    return (points[0], points[1], points[2], points[3])
 
 
 def _polygon(

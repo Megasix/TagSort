@@ -14,6 +14,7 @@ from tagsort._version import __version__
 from tagsort.errors import ImageError, PatternError, ProfileError, ProviderError, TagSortError
 from tagsort.fallback.base import ProviderTag, Usage, VisionAnswer, VisionProvider, VisionRequest
 from tagsort.models import ModelError, available_models, download_model
+from tagsort.pipeline.local import LocalPipeline
 from tagsort.pipeline.reader import Reader
 from tagsort.profile import Profile, TagSpec
 from tagsort.types import Candidate, ImageInfo, Point, ReadResult, Tag, TagSource, TagStatus
@@ -31,6 +32,7 @@ __all__ = [
     "GeminiProvider",
     "ImageError",
     "ImageInfo",
+    "LocalPipeline",
     "ModelError",
     "OpenAIProvider",
     "PatternError",

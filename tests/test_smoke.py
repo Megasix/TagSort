@@ -25,6 +25,7 @@ def test_public_api() -> None:
         "GeminiProvider",
         "ImageError",
         "ImageInfo",
+        "LocalPipeline",
         "ModelError",
         "OpenAIProvider",
         "PatternError",
