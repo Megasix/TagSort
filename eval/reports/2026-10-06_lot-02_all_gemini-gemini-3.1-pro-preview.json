@@ -1,0 +1,95 @@
+{
+  "report_version": 1,
+  "created": "2026-10-06",
+  "engine_version": "0.0.1",
+  "dataset": "lot-02",
+  "split": null,
+  "backend": {
+    "provider": "gemini",
+    "model": "gemini-3.1-pro-preview"
+  },
+  "metrics": {
+    "photos": 160,
+    "failed_photos": 0,
+    "readable_tags": 60,
+    "unreadable_tags": 0,
+    "predicted_tags": 62,
+    "exact_matches": 60,
+    "exact_match_rate": 1.0,
+    "character_error_rate": 0.0,
+    "accepted_tags": 59,
+    "accepted_correct": 59,
+    "automation_rate": 0.9833,
+    "silent_errors": 0,
+    "silent_error_rate": 0.0,
+    "review_tags": 2,
+    "unreadable_predictions": 1,
+    "missed_tags": 0,
+    "invented_tags": 2,
+    "fallback_share": 1.0,
+    "seconds_per_photo": 7.28,
+    "sessions": {
+      "": {
+        "photos": 2,
+        "readable_tags": 0,
+        "exact_match_rate": 0.0,
+        "silent_errors": 0
+      },
+      "2025-05-08": {
+        "photos": 11,
+        "readable_tags": 4,
+        "exact_match_rate": 1.0,
+        "silent_errors": 0
+      },
+      "2025-05-10": {
+        "photos": 10,
+        "readable_tags": 4,
+        "exact_match_rate": 1.0,
+        "silent_errors": 0
+      },
+      "2026-04-14": {
+        "photos": 49,
+        "readable_tags": 22,
+        "exact_match_rate": 1.0,
+        "silent_errors": 0
+      },
+      "2026-04-15": {
+        "photos": 38,
+        "readable_tags": 13,
+        "exact_match_rate": 1.0,
+        "silent_errors": 0
+      },
+      "2026-06-02": {
+        "photos": 45,
+        "readable_tags": 15,
+        "exact_match_rate": 1.0,
+        "silent_errors": 0
+      },
+      "2026-06-03": {
+        "photos": 4,
+        "readable_tags": 2,
+        "exact_match_rate": 1.0,
+        "silent_errors": 0
+      },
+      "2026-06-04": {
+        "photos": 1,
+        "readable_tags": 0,
+        "exact_match_rate": 0.0,
+        "silent_errors": 0
+      }
+    }
+  },
+  "tokens": {
+    "input": 222118,
+    "output": 4155
+  },
+  "price_per_million_tokens": {
+    "input": 2.0,
+    "output": 12.0
+  },
+  "cost_per_1000_photos_usd": 3.09,
+  "prelabeled_with": [
+    "gemini:gemini-3.5-flash-lite",
+    "openai:gpt-6-luna"
+  ]
+}
