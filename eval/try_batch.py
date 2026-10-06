@@ -96,18 +96,29 @@ class Counting:
         return answer
 
 
+PLACEHOLDER = "A_REMPLIR"
+NO_TAG = "-"
+UNREADABLE = "?"
+
+
 def load_labels(path: Path) -> dict[str, list[tuple[str, str]]]:
-    """Return image name -> list of (tag_id, text). '?' marks a tag nobody can read."""
-    labels: dict[str, list[tuple[str, str]]] = defaultdict(list)
-    with path.open(encoding="utf-8-sig", newline="") as handle:
-        for row in csv.DictReader(handle):
-            image = (row.get("image") or "").strip()
-            if not image or image.startswith("EXEMPLE_"):
-                continue
-            labels.setdefault(image, [])
-            text = (row.get("text") or "").strip()
-            if text:
-                labels[image].append(((row.get("tag_id") or "").strip(), text))
+    """Return image name -> list of (tag_id, text) for every labeled photo.
+
+    ``?`` marks a tag nobody can read; ``-`` or an empty text marks a photo without a
+    tag. Rows still holding the ``A_REMPLIR`` placeholder are not labeled yet and are
+    skipped. Comma- and semicolon-separated files are both accepted.
+    """
+    text = path.read_text(encoding="utf-8-sig")
+    delimiter = ";" if text.splitlines()[0].count(";") > text.splitlines()[0].count(",") else ","
+    labels: dict[str, list[tuple[str, str]]] = {}
+    for row in csv.DictReader(text.splitlines(), delimiter=delimiter):
+        image = (row.get("image") or "").strip()
+        tag_text = (row.get("text") or "").strip()
+        if not image or image.startswith("EXEMPLE_") or tag_text == PLACEHOLDER:
+            continue
+        labels.setdefault(image, [])
+        if tag_text and tag_text != NO_TAG:
+            labels[image].append(((row.get("tag_id") or "").strip(), tag_text))
     return labels
 
 
@@ -181,7 +192,7 @@ def run(dataset: Path, provider_name: str, limit: int | None) -> None:
             unlabeled += 1
             verdict = "no label"
         else:
-            readable = [text for _, text in truth if text != "?"]
+            readable = [text for _, text in truth if text != UNREADABLE]
             hits = sum(1 for text in readable if text in read_texts)
             wrong = [
                 tag.text

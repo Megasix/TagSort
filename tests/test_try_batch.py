@@ -27,14 +27,31 @@ def test_load_labels_skips_examples_and_keeps_empty_photos(tmp_path: Path) -> No
         "IMG_1.jpg,s,primary,MD04127,\n"
         "IMG_1.jpg,s,secondary,AB-123,\n"
         "IMG_2.jpg,s,,,no tag\n"
-        "IMG_3.jpg,s,primary,?,unreadable\n",
+        "IMG_3.jpg,s,primary,?,unreadable\n"
+        "IMG_4.jpg,s,,-,\n"
+        "IMG_5.jpg,s,,A_REMPLIR,\n",
         encoding="utf-8",
     )
     assert try_batch.load_labels(path) == {
         "IMG_1.jpg": [("primary", "MD04127"), ("secondary", "AB-123")],
         "IMG_2.jpg": [],
         "IMG_3.jpg": [("primary", "?")],
+        "IMG_4.jpg": [],
     }
+
+
+def test_load_labels_accepts_semicolons(tmp_path: Path) -> None:
+    path = tmp_path / "labels.csv"
+    path.write_text(
+        "image;session;tag_id;text;notes\nIMG_1.jpg;s;;MD04127;a, b\n", encoding="utf-8"
+    )
+    assert try_batch.load_labels(path) == {"IMG_1.jpg": [("", "MD04127")]}
+
+
+def test_prefilled_file_has_no_labels_yet(tmp_path: Path) -> None:
+    path = tmp_path / "labels.csv"
+    path.write_text("image,session,tag_id,text,notes\nIMG_1.jpg,s,,A_REMPLIR,\n", encoding="utf-8")
+    assert try_batch.load_labels(path) == {}
 
 
 def test_prices_cover_default_models() -> None:
