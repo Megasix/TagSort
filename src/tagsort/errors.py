@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["PatternError", "ProfileError", "TagSortError"]
+__all__ = ["ImageError", "PatternError", "ProfileError", "ProviderError", "TagSortError"]
 
 
 class TagSortError(Exception):
@@ -75,3 +75,39 @@ class PatternError(ProfileError):
             position=self.position,
             location=location,
         )
+
+
+class ImageError(TagSortError, ValueError):
+    """An image cannot be decoded, or its format is not supported."""
+
+
+class ProviderError(TagSortError):
+    """A vision API provider failed to return a usable answer.
+
+    Attributes:
+        provider: Name of the provider, for example ``anthropic``.
+        reason: Stable identifier of the failure: ``authentication``, ``bad_request``,
+            ``rate_limit``, ``server``, ``network``, ``refused``, ``truncated`` or
+            ``invalid_response``.
+        status_code: HTTP status code, when the provider answered with an error.
+        retryable: Whether retrying the same request later may succeed.
+    """
+
+    _RETRYABLE = frozenset({"rate_limit", "server", "network"})
+
+    def __init__(
+        self, message: str, *, provider: str, reason: str, status_code: int | None = None
+    ) -> None:
+        """Create the error.
+
+        Args:
+            message: What went wrong, in one sentence. Never contains the API key.
+            provider: Name of the provider.
+            reason: Stable identifier of the failure.
+            status_code: HTTP status code, if any.
+        """
+        self.provider = provider
+        self.reason = reason
+        self.status_code = status_code
+        self.retryable = reason in self._RETRYABLE
+        super().__init__(f"{provider}: {message}")
