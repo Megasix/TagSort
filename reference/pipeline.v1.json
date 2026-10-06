@@ -1,0 +1,732 @@
+{
+ "description": "Reference vectors for the local pipeline (docs/local.md). A port runs the same model on each image with the same profile and must match: texts, tag ids and statuses exactly; probabilities and scores within probability_tolerance; coordinates within pixel_tolerance; angles within angle_tolerance degrees.",
+ "version": "1.0",
+ "model": "ppocrv6-tiny",
+ "model_version": "1.0",
+ "detection_side": 1600,
+ "profile": {
+  "schema_version": "1.0",
+  "name": "Reference",
+  "tags_per_individual": 2,
+  "tags": [
+   {
+    "id": "primary",
+    "pattern": "GJ\\d{5}"
+   },
+   {
+    "id": "secondary",
+    "pattern": "\\d{4}"
+   }
+  ]
+ },
+ "pixel_tolerance": 3.0,
+ "probability_tolerance": 0.03,
+ "angle_tolerance": 2.0,
+ "cases": [
+  {
+   "image": "images/upright.png",
+   "detection": [
+    {
+     "quad": [
+      [
+       385.5,
+       384.7
+      ],
+      [
+       739.5,
+       388.4
+      ],
+      [
+       738.2,
+       508.5
+      ],
+      [
+       384.2,
+       504.7
+      ]
+     ],
+     "score": 0.9846
+    }
+   ],
+   "lines": [
+    {
+     "quad": [
+      [
+       385.5,
+       384.7
+      ],
+      [
+       739.5,
+       388.4
+      ],
+      [
+       738.2,
+       508.5
+      ],
+      [
+       384.2,
+       504.7
+      ]
+     ],
+     "angle": 0.6,
+     "agrees": true,
+     "readings": [
+      {
+       "text": "GJ07966",
+       "probability": 0.847,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ00966",
+       "probability": 0.0002,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ07066",
+       "probability": 0.0001,
+       "tag_id": "primary"
+      }
+     ]
+    }
+   ],
+   "result": {
+    "tags": [
+     {
+      "tag_id": "primary",
+      "text": "GJ07966",
+      "status": "accepted",
+      "angle": 0.6,
+      "polygon": [
+       [
+        385.5,
+        384.7
+       ],
+       [
+        739.5,
+        388.4
+       ],
+       [
+        738.2,
+        508.5
+       ],
+       [
+        384.2,
+        504.7
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "image": "images/upside_down.png",
+   "detection": [
+    {
+     "quad": [
+      [
+       483.9,
+       286.5
+      ],
+      [
+       837.8,
+       289.1
+      ],
+      [
+       837.0,
+       407.2
+      ],
+      [
+       483.0,
+       404.7
+      ]
+     ],
+     "score": 0.9842
+    }
+   ],
+   "lines": [
+    {
+     "quad": [
+      [
+       837.0,
+       407.2
+      ],
+      [
+       483.0,
+       404.7
+      ],
+      [
+       483.9,
+       286.5
+      ],
+      [
+       837.8,
+       289.1
+      ]
+     ],
+     "angle": 180.4,
+     "agrees": true,
+     "readings": [
+      {
+       "text": "GJ08104",
+       "probability": 0.8382,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ08004",
+       "probability": 0.0014,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ00104",
+       "probability": 0.0005,
+       "tag_id": "primary"
+      }
+     ]
+    }
+   ],
+   "result": {
+    "tags": [
+     {
+      "tag_id": "primary",
+      "text": "GJ08104",
+      "status": "accepted",
+      "angle": 180.4,
+      "polygon": [
+       [
+        837.0,
+        407.2
+       ],
+       [
+        483.0,
+        404.7
+       ],
+       [
+        483.9,
+        286.5
+       ],
+       [
+        837.8,
+        289.1
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "image": "images/quarter_turn.png",
+   "detection": [
+    {
+     "quad": [
+      [
+       687.6,
+       237.9
+      ],
+      [
+       811.2,
+       237.4
+      ],
+      [
+       812.5,
+       587.3
+      ],
+      [
+       688.9,
+       587.8
+      ]
+     ],
+     "score": 0.9812
+    }
+   ],
+   "lines": [
+    {
+     "quad": [
+      [
+       688.9,
+       587.8
+      ],
+      [
+       687.6,
+       237.9
+      ],
+      [
+       811.2,
+       237.4
+      ],
+      [
+       812.5,
+       587.3
+      ]
+     ],
+     "angle": 269.8,
+     "agrees": true,
+     "readings": [
+      {
+       "text": "GJ08305",
+       "probability": 0.9276,
+       "tag_id": "primary"
+      },
+      {
+       "text": "9080",
+       "probability": 0.0002,
+       "tag_id": "secondary"
+      },
+      {
+       "text": "9880",
+       "probability": 0.0,
+       "tag_id": "secondary"
+      }
+     ]
+    }
+   ],
+   "result": {
+    "tags": [
+     {
+      "tag_id": "primary",
+      "text": "GJ08305",
+      "status": "accepted",
+      "angle": 269.8,
+      "polygon": [
+       [
+        688.9,
+        587.8
+       ],
+       [
+        687.6,
+        237.9
+       ],
+       [
+        811.2,
+        237.4
+       ],
+       [
+        812.5,
+        587.3
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "image": "images/tilted.png",
+   "detection": [
+    {
+     "quad": [
+      [
+       332.0,
+       426.1
+      ],
+      [
+       675.9,
+       334.9
+      ],
+      [
+       707.3,
+       450.1
+      ],
+      [
+       363.5,
+       541.4
+      ]
+     ],
+     "score": 0.987
+    }
+   ],
+   "lines": [
+    {
+     "quad": [
+      [
+       332.0,
+       426.1
+      ],
+      [
+       675.9,
+       334.9
+      ],
+      [
+       707.3,
+       450.1
+      ],
+      [
+       363.5,
+       541.4
+      ]
+     ],
+     "angle": 345.1,
+     "agrees": true,
+     "readings": [
+      {
+       "text": "GJ07990",
+       "probability": 0.6551,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ07900",
+       "probability": 0.0004,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ00990",
+       "probability": 0.0001,
+       "tag_id": "primary"
+      }
+     ]
+    }
+   ],
+   "result": {
+    "tags": [
+     {
+      "tag_id": "primary",
+      "text": "GJ07990",
+      "status": "accepted",
+      "angle": 345.1,
+      "polygon": [
+       [
+        332.0,
+        426.1
+       ],
+       [
+        675.9,
+        334.9
+       ],
+       [
+        707.3,
+        450.1
+       ],
+       [
+        363.5,
+        541.4
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "image": "images/distractor.png",
+   "detection": [
+    {
+     "quad": [
+      [
+       289.7,
+       194.1
+      ],
+      [
+       633.3,
+       194.1
+      ],
+      [
+       633.3,
+       300.3
+      ],
+      [
+       289.7,
+       300.3
+      ]
+     ],
+     "score": 0.9829
+    },
+    {
+     "quad": [
+      [
+       116.5,
+       1002.1
+      ],
+      [
+       805.5,
+       1002.1
+      ],
+      [
+       805.5,
+       1062.3
+      ],
+      [
+       116.5,
+       1062.3
+      ]
+     ],
+     "score": 0.9762
+    }
+   ],
+   "lines": [
+    {
+     "quad": [
+      [
+       289.7,
+       194.1
+      ],
+      [
+       633.3,
+       194.1
+      ],
+      [
+       633.3,
+       300.3
+      ],
+      [
+       289.7,
+       300.3
+      ]
+     ],
+     "angle": 0.0,
+     "agrees": true,
+     "readings": [
+      {
+       "text": "GJ07986",
+       "probability": 0.9837,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ07906",
+       "probability": 0.0001,
+       "tag_id": "primary"
+      },
+      {
+       "text": "9860",
+       "probability": 0.0,
+       "tag_id": "secondary"
+      }
+     ]
+    }
+   ],
+   "result": {
+    "tags": [
+     {
+      "tag_id": "primary",
+      "text": "GJ07986",
+      "status": "accepted",
+      "angle": 0.0,
+      "polygon": [
+       [
+        289.7,
+        194.1
+       ],
+       [
+        633.3,
+        194.1
+       ],
+       [
+        633.3,
+        300.3
+       ],
+       [
+        289.7,
+        300.3
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "image": "images/two_tags.png",
+   "detection": [
+    {
+     "quad": [
+      [
+       188.7,
+       239.5
+      ],
+      [
+       536.3,
+       239.5
+      ],
+      [
+       536.3,
+       353.6
+      ],
+      [
+       188.7,
+       353.6
+      ]
+     ],
+     "score": 0.9873
+    },
+    {
+     "quad": [
+      [
+       887.6,
+       689.9
+      ],
+      [
+       1119.2,
+       691.4
+      ],
+      [
+       1118.4,
+       805.2
+      ],
+      [
+       886.8,
+       803.7
+      ]
+     ],
+     "score": 0.9836
+    }
+   ],
+   "lines": [
+    {
+     "quad": [
+      [
+       188.7,
+       239.5
+      ],
+      [
+       536.3,
+       239.5
+      ],
+      [
+       536.3,
+       353.6
+      ],
+      [
+       188.7,
+       353.6
+      ]
+     ],
+     "angle": 0.0,
+     "agrees": true,
+     "readings": [
+      {
+       "text": "GJ07966",
+       "probability": 0.7858,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ07066",
+       "probability": 0.0001,
+       "tag_id": "primary"
+      },
+      {
+       "text": "GJ07096",
+       "probability": 0.0,
+       "tag_id": "primary"
+      }
+     ]
+    },
+    {
+     "quad": [
+      [
+       887.6,
+       689.9
+      ],
+      [
+       1119.2,
+       691.4
+      ],
+      [
+       1118.4,
+       805.2
+      ],
+      [
+       886.8,
+       803.7
+      ]
+     ],
+     "angle": 0.4,
+     "agrees": true,
+     "readings": [
+      {
+       "text": "2025",
+       "probability": 0.9988,
+       "tag_id": "secondary"
+      },
+      {
+       "text": "9707",
+       "probability": 0.1642,
+       "tag_id": "secondary"
+      },
+      {
+       "text": "9007",
+       "probability": 0.076,
+       "tag_id": "secondary"
+      }
+     ]
+    }
+   ],
+   "result": {
+    "tags": [
+     {
+      "tag_id": "primary",
+      "text": "GJ07966",
+      "status": "accepted",
+      "angle": 0.0,
+      "polygon": [
+       [
+        188.7,
+        239.5
+       ],
+       [
+        536.3,
+        239.5
+       ],
+       [
+        536.3,
+        353.6
+       ],
+       [
+        188.7,
+        353.6
+       ]
+      ]
+     },
+     {
+      "tag_id": "secondary",
+      "text": "2025",
+      "status": "accepted",
+      "angle": 0.4,
+      "polygon": [
+       [
+        887.6,
+        689.9
+       ],
+       [
+        1119.2,
+        691.4
+       ],
+       [
+        1118.4,
+        805.2
+       ],
+       [
+        886.8,
+        803.7
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "image": "images/no_tag.png",
+   "detection": [
+    {
+     "quad": [
+      [
+       116.9,
+       1003.5
+      ],
+      [
+       736.1,
+       1003.5
+      ],
+      [
+       736.1,
+       1059.0
+      ],
+      [
+       116.9,
+       1059.0
+      ]
+     ],
+     "score": 0.9756
+    }
+   ],
+   "lines": [],
+   "result": {
+    "tags": []
+   }
+  }
+ ]
+}

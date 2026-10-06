@@ -126,3 +126,7 @@ Thumbs.db
 
 # --- Local datasets: photos and labels live outside the repository ---
 TagSort-data/
+
+# --- Synthetic reference images (rendered, never photos) ---
+!reference/images/
+!reference/images/*.png
