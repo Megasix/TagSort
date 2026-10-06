@@ -202,7 +202,16 @@ def _data_url(image: Image.Image, side: int) -> str:
 
 
 def _page(name: str, rows: list[Row]) -> str:
-    ordered = sorted(enumerate(rows), key=lambda item: (item[1].priority, item[0]))
+    # Photos needing attention come first; rows of one photo always stay together.
+    first_row: dict[str, int] = {}
+    priority: dict[str, int] = {}
+    for index, row in enumerate(rows):
+        first_row.setdefault(row.image, index)
+        priority[row.image] = min(priority.get(row.image, row.priority), row.priority)
+    ordered = sorted(
+        enumerate(rows),
+        key=lambda item: (priority[item[1].image], first_row[item[1].image], item[0]),
+    )
     body = "\n".join(_row_html(index, row) for index, row in ordered)
     data = json.dumps([row.csv_record() for row in rows])
     return (
