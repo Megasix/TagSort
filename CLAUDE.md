@@ -63,7 +63,7 @@ If a task touches any of these, stop and ask.
 | Project management | `uv`, `pyproject.toml` (`hatchling` build backend) |
 | Quality | `ruff` (lint and format), `mypy --strict`, `pytest`, `pytest-cov` |
 | Inference | `onnxruntime`, `numpy`, `pillow` |
-| Extras | `tagsort[api]` (vision API fallback), `tagsort[server]` (FastAPI), `tagsort[train]` (PyTorch and training tools) |
+| Extras | `tagsort[api]` (vision API fallback, model download), `tagsort[server]` (FastAPI), `tagsort[train]` (PaddlePaddle and PaddleOCR training tools, the native framework of the PP-OCR models) |
 | CI | GitHub Actions: lint, type check, tests, license check, engine evaluation |
 | License | Apache 2.0 |
 
@@ -220,11 +220,13 @@ One milestone at a time. At the end of each, Claude stops, summarizes what was d
 | M2 | End-to-end `Reader` with the `api` backend only (vision fallback) | Correct reads on a real photo batch; output conforms to schema |
 | M3 | Evaluation harness and first report (API backend as baseline) | Versioned report with numbers |
 | M4 | Local pipeline: detection, orientation, recognition, constrained decoding, calibration, cascade | Target set in M3 reached |
-| M5 | Training scripts, fine-tuning, ONNX and LiteRT (formerly TFLite) export, manifests, reference vectors | Same results in Python and on the export, within tolerance |
+| M5 | Reference vectors, synthetic data generator, training scripts, fine-tuning, calibration on real data, ONNX models for every platform | Same results in Python and on the exported models, within tolerance |
 | M6 | CLI, HTTP server, Docker image | `docker run` reads a folder with no Python install |
 | M7 | v0.1 release: PyPI, weights on Hugging Face, model card, documentation | A newcomer reads a tag in under five minutes using the README |
 
 M2 comes before the local pipeline: the BenchSort beta starts on the API fallback and produces the data that will train the local model.
+
+Order decided by the maintainer on 2026-10-06: the parts of M5 that need no data (reference vectors, synthetic generator, training scripts) come first, then M6 so the BenchSort beta can start within weeks; fine-tuning and calibration on real data follow once the beta has produced labeled tags.
 
 ## 13. Working method
 
@@ -236,8 +238,9 @@ M2 comes before the local pipeline: the BenchSort beta starts on the API fallbac
 - Never write keys, tokens or personal paths into the repository.
 - If a rule in this file seems to block a better solution, say so and propose an edit to this file instead of working around it.
 
-## 14. Open decisions
+## 14. Decisions
 
-- Starting models (PaddleOCR, docTR, TrOCR, PARSeq): after M3 numbers, licenses verified.
-- Vision fallback provider for the beta: compare cost and accuracy in M2.
-- Export route to LiteRT and Flutter inference package: validate in M5.
+- Starting models: PP-OCRv6 text detection and recognition (Apache 2.0, official ONNX releases), chosen after the M3 numbers; tiny for mobile, small or medium for servers.
+- Vision fallback for the beta: Gemini Flash-Lite by default, every provider documented in `docs/providers.md` (M2, M3).
+- Export and mobile runtime: ONNX everywhere. The same model files run in Python (ONNX Runtime), Flutter (`flutter_onnxruntime`, MIT) and browsers (`onnxruntime-web`, MIT). LiteRT stays a fallback option if ONNX Runtime proves too heavy on a target device (it needs iOS 16 or later).
+- Training framework: PaddlePaddle with PaddleOCR's training tools. Training needs an NVIDIA GPU (rented or Colab); synthetic training images may use open fonts, which are never distributed.
