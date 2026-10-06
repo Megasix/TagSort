@@ -1,0 +1,216 @@
+{
+  "description": "Test vectors for the tag pattern grammar (docs/patterns.md). A port must accept every 'valid' pattern with the given lengths and minimal automaton size, match every string in 'match' and none in 'no_match', and reject every 'invalid' pattern with the given code at the given code point position.",
+  "version": "1.0",
+  "valid": [
+    {
+      "pattern": "MD\\d{5}",
+      "min_length": 7,
+      "max_length": 7,
+      "num_states": 8,
+      "match": ["MD04127", "MD00000", "MD99999"],
+      "no_match": ["MD4127", "MD041270", "md04127", "MD0412A", "MD04127 ", "MD٠٤١٢٧", ""]
+    },
+    {
+      "pattern": "[A-Z]{2}-\\d{3,4}",
+      "min_length": 6,
+      "max_length": 7,
+      "num_states": 8,
+      "match": ["AB-123", "ZZ-0000", "QX-9876"],
+      "no_match": ["AB123", "A-123", "AB-12", "AB-12345", "ab-123", "AB_123"]
+    },
+    {
+      "pattern": "(MD|NHM)\\d{5}",
+      "min_length": 7,
+      "max_length": 8,
+      "num_states": 10,
+      "match": ["MD04127", "NHM04127"],
+      "no_match": ["NH04127", "MDNHM04127", "M04127"]
+    },
+    {
+      "pattern": "MD\\d{5}|NHM\\d{4}",
+      "min_length": 7,
+      "max_length": 7,
+      "num_states": 10,
+      "match": ["MD04127", "NHM0412"],
+      "no_match": ["MD0412", "NHM04127"]
+    },
+    {
+      "pattern": "[A-Z]{1,4} \\d{1,6}(\\.\\d{1,2}){0,1}",
+      "min_length": 3,
+      "max_length": 14,
+      "num_states": 15,
+      "match": ["A 1", "MNHN 2001", "MNHN 2001.12", "MNHN 2001.1", "ABCD 123456.99"],
+      "no_match": ["MNHN 2001.", "MNHN2001", "MNHN 2001.123", "ABCDE 1", "MNHN 1234567"]
+    },
+    {
+      "pattern": "[-a]",
+      "min_length": 1,
+      "max_length": 1,
+      "num_states": 2,
+      "match": ["-", "a"],
+      "no_match": ["b", ""]
+    },
+    {
+      "pattern": "[a-]",
+      "min_length": 1,
+      "max_length": 1,
+      "num_states": 2,
+      "match": ["-", "a"],
+      "no_match": ["b"]
+    },
+    {
+      "pattern": "[a\\-z]",
+      "min_length": 1,
+      "max_length": 1,
+      "num_states": 2,
+      "match": ["a", "-", "z"],
+      "no_match": ["b", "y"]
+    },
+    {
+      "pattern": "[x^]",
+      "min_length": 1,
+      "max_length": 1,
+      "num_states": 2,
+      "match": ["x", "^"],
+      "no_match": ["y"]
+    },
+    {
+      "pattern": "[\\]\\[\\\\]",
+      "min_length": 1,
+      "max_length": 1,
+      "num_states": 2,
+      "match": ["]", "[", "\\"],
+      "no_match": ["a"]
+    },
+    {
+      "pattern": "[\\dA-F]{2}",
+      "min_length": 2,
+      "max_length": 2,
+      "num_states": 3,
+      "match": ["0A", "F9", "AB"],
+      "no_match": ["0a", "G0"]
+    },
+    {
+      "pattern": "\\.\\-\\(\\)\\[\\]\\{\\}\\|\\?\\*\\+\\^\\$\\\\\\/\\ ",
+      "min_length": 17,
+      "max_length": 17,
+      "num_states": 18,
+      "match": [".-()[]{}|?*+^$\\/ "],
+      "no_match": [".-()[]{}|?*+^$\\/"]
+    },
+    {
+      "pattern": "Ré-é",
+      "min_length": 4,
+      "max_length": 4,
+      "num_states": 5,
+      "match": ["Ré-é"],
+      "no_match": ["Re-e", "Ré-e"]
+    },
+    {
+      "pattern": "a|ab|abc",
+      "min_length": 1,
+      "max_length": 3,
+      "num_states": 4,
+      "match": ["a", "ab", "abc"],
+      "no_match": ["b", "abcd", "ac"]
+    },
+    {
+      "pattern": "(a|ab)(c|bcd)",
+      "min_length": 2,
+      "max_length": 5,
+      "num_states": 7,
+      "match": ["ac", "abcd", "abc", "abbcd"],
+      "no_match": ["ab", "abd", "abcbcd"]
+    },
+    {
+      "pattern": "((a|b){2}|c){1,2}",
+      "min_length": 1,
+      "max_length": 4,
+      "num_states": 5,
+      "match": ["c", "cc", "ab", "abc", "cab", "abba"],
+      "no_match": ["a", "ccc", "abcab", "ca"]
+    },
+    {
+      "pattern": "x{64}",
+      "min_length": 64,
+      "max_length": 64,
+      "num_states": 65,
+      "match": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"],
+      "no_match": ["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+    },
+    {
+      "pattern": "(x{64}){4}",
+      "min_length": 256,
+      "max_length": 256,
+      "num_states": 257,
+      "match": [],
+      "no_match": ["x"]
+    },
+    {
+      "pattern": "a{0,1}b",
+      "min_length": 1,
+      "max_length": 2,
+      "num_states": 3,
+      "match": ["b", "ab"],
+      "no_match": ["a", "aab"]
+    },
+    {
+      "pattern": "A B",
+      "min_length": 3,
+      "max_length": 3,
+      "num_states": 4,
+      "match": ["A B"],
+      "no_match": ["AB", "A  B"]
+    }
+  ],
+  "invalid": [
+    { "pattern": "", "code": "empty_pattern", "position": 0 },
+    { "pattern": "a{0,1}", "code": "matches_empty", "position": 0 },
+    { "pattern": "(a|b{0,3}){1,2}", "code": "matches_empty", "position": 0 },
+    { "pattern": "(x{64}){5}", "code": "too_long", "position": 0 },
+    { "pattern": "(a", "code": "unbalanced_paren", "position": 0 },
+    { "pattern": "a)", "code": "unbalanced_paren", "position": 1 },
+    { "pattern": ")", "code": "unbalanced_paren", "position": 0 },
+    { "pattern": "((a)", "code": "unbalanced_paren", "position": 0 },
+    { "pattern": "[ab", "code": "unbalanced_bracket", "position": 0 },
+    { "pattern": "a{2", "code": "unbalanced_brace", "position": 1 },
+    { "pattern": "()", "code": "empty_group", "position": 1 },
+    { "pattern": "(a|)", "code": "empty_alternative", "position": 3 },
+    { "pattern": "|a", "code": "empty_alternative", "position": 0 },
+    { "pattern": "a|", "code": "empty_alternative", "position": 2 },
+    { "pattern": "[]", "code": "empty_class", "position": 1 },
+    { "pattern": "(((((((((((((((((a)))))))))))))))))", "code": "nested_too_deep", "position": 16 },
+    { "pattern": "MD\\d+", "code": "unbounded_quantifier", "position": 4 },
+    { "pattern": "a*", "code": "unbounded_quantifier", "position": 1 },
+    { "pattern": "a{3,}", "code": "unbounded_quantifier", "position": 1 },
+    { "pattern": "a?", "code": "unsupported_quantifier", "position": 1 },
+    { "pattern": "{2}", "code": "invalid_quantifier", "position": 0 },
+    { "pattern": "a{x}", "code": "invalid_quantifier", "position": 1 },
+    { "pattern": "a{,3}", "code": "invalid_quantifier", "position": 1 },
+    { "pattern": "a{ 2}", "code": "invalid_quantifier", "position": 1 },
+    { "pattern": "a{3,2}", "code": "invalid_quantifier", "position": 1 },
+    { "pattern": "a{0}", "code": "invalid_quantifier", "position": 1 },
+    { "pattern": "a{2}{3}", "code": "invalid_quantifier", "position": 4 },
+    { "pattern": "a{2}+", "code": "invalid_quantifier", "position": 4 },
+    { "pattern": "a{65}", "code": "repeat_too_large", "position": 1 },
+    { "pattern": "^MD", "code": "anchor", "position": 0 },
+    { "pattern": "MD$", "code": "anchor", "position": 2 },
+    { "pattern": "M.", "code": "wildcard", "position": 1 },
+    { "pattern": "a]", "code": "unescaped_special", "position": 1 },
+    { "pattern": "a}", "code": "unescaped_special", "position": 1 },
+    { "pattern": "[a[]", "code": "unescaped_special", "position": 2 },
+    { "pattern": "(?:a)", "code": "group_extension", "position": 1 },
+    { "pattern": "\\w", "code": "unsupported_escape", "position": 0 },
+    { "pattern": "[\\s]", "code": "unsupported_escape", "position": 1 },
+    { "pattern": "ab\\", "code": "unsupported_escape", "position": 2 },
+    { "pattern": "(a)\\1", "code": "backreference", "position": 3 },
+    { "pattern": "[^a]", "code": "negated_class", "position": 1 },
+    { "pattern": "[z-a]", "code": "invalid_range", "position": 1 },
+    { "pattern": "[\\d-z]", "code": "invalid_range", "position": 1 },
+    { "pattern": "[a-\\d]", "code": "invalid_range", "position": 3 },
+    { "pattern": "[\u00a0-\u02a0]", "code": "class_too_large", "position": 1 },
+    { "pattern": "[\u0100-\u01ff\u0200-\u02ffa]", "code": "class_too_large", "position": 0 },
+    { "pattern": "a\u0007", "code": "control_character", "position": 1 },
+    { "pattern": "[~-\u00a1]", "code": "control_character", "position": 1 }
+  ]
+}
