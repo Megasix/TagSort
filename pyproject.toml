@@ -10,6 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Barry Lawson" }]
+keywords = ["ocr", "natural history", "museum", "specimen", "label", "onnx", "computer vision"]
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.0",
@@ -17,7 +18,7 @@ dependencies = [
     "pillow>=11",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
@@ -36,6 +37,8 @@ tagsort-eval = "tagsort.evaluation.cli:main"
 
 [project.urls]
 Repository = "https://github.com/Megasix/TagSort"
+Documentation = "https://github.com/Megasix/TagSort/tree/main/docs"
+Changelog = "https://github.com/Megasix/TagSort/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Megasix/TagSort/issues"
 
 [project.optional-dependencies]

@@ -100,3 +100,12 @@ that ships to users must be compatible.
 ## License
 
 By contributing, you agree that your contributions are licensed under the Apache License 2.0.
+
+## Releasing
+
+1. Update `__version__` in `src/tagsort/_version.py` and add a section to `CHANGELOG.md`.
+2. Merge to `main` through a pull request.
+3. Publish a GitHub release tagged `vX.Y.Z` (matching the version) with the changelog
+   section as notes. The `Release` workflow then publishes the packages to PyPI (trusted
+   publishing, no stored password) and the Docker image to `ghcr.io/megasix/tagsort`.
+
