@@ -38,6 +38,7 @@ result = reader.read("IMG_0412.jpg")
 
 The photo never leaves the device; with a fallback, only the crop of a doubtful tag is
 sent. A reading is accepted only if it matches a pattern of the profile.
+See [docs/local.md](docs/local.md) for the models, how a tag is read, and measured results.
 
 ## Reading tags through a vision API
 
