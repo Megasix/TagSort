@@ -102,6 +102,17 @@ An invalid profile raises `ProfileError` when it is loaded, with the location of
 Patterns use a small regex subset that describes a finite set of texts; see
 [docs/patterns.md](docs/patterns.md).
 
+## Running as a service
+
+`tagsort serve` (or the Docker image in `docker/`) exposes an HTTP API for applications in
+any language; `tagsort read` reads a folder from the command line. See
+[docs/server.md](docs/server.md) for the endpoints, configuration and deployment on Render.
+
+```sh
+docker build -f docker/Dockerfile -t tagsort .
+docker run -v "$PWD:/data" tagsort read /data/photos --profile /data/profile.json
+```
+
 ## Measuring accuracy on your photos
 
 `tagsort-eval` reads a labeled folder of your photos and reports exact matches, silent

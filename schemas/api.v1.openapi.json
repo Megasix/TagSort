@@ -1,0 +1,172 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TagSort HTTP API",
+    "version": "1.0.0",
+    "description": "Reads specimen identification tags in photos. Photos are processed in memory and never stored. Responses follow schemas/result.v1.json; profiles follow schemas/profile.v1.json.",
+    "license": { "name": "Apache-2.0", "identifier": "Apache-2.0" }
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "security": [{ "bearer": [] }],
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Whether the service is up, and how it reads",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The service is ready.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } }
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "operationId": "models",
+        "summary": "Models this server knows",
+        "responses": {
+          "200": {
+            "description": "Known models.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Models" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/read": {
+      "post": {
+        "operationId": "read",
+        "summary": "Find and read every tag in one photo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": {
+                    "description": "The photo: JPEG, PNG, WebP or TIFF.",
+                    "type": "string",
+                    "contentMediaType": "application/octet-stream"
+                  },
+                  "profile": {
+                    "description": "The profile as a JSON document following profile.v1.json. Give either profile or profile_name.",
+                    "type": "string",
+                    "contentMediaType": "application/json"
+                  },
+                  "profile_name": {
+                    "description": "Name of a profile loaded by the server at startup.",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Every tag found, possibly none.",
+            "content": { "application/json": { "schema": { "$ref": "result.v1.json" } } }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The token set in the server's TAGSORT_API_TOKEN environment variable."
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "The request failed; the error code says why.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "required": ["status", "engine_version", "model", "fallback"],
+        "additionalProperties": false,
+        "properties": {
+          "status": { "const": "ok" },
+          "engine_version": { "type": "string" },
+          "model": { "description": "Local model reading the photos.", "type": "string" },
+          "fallback": {
+            "description": "Vision API reading the crops of doubtful tags, as provider:model, or null when off.",
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "Models": {
+        "type": "object",
+        "required": ["models", "active"],
+        "additionalProperties": false,
+        "properties": {
+          "active": { "type": "string" },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "size_bytes", "license", "downloaded"],
+              "additionalProperties": false,
+              "properties": {
+                "name": { "type": "string" },
+                "size_bytes": { "type": "integer", "minimum": 0 },
+                "license": { "type": "string" },
+                "downloaded": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "enum": [
+                  "invalid_request",
+                  "invalid_profile",
+                  "invalid_pattern",
+                  "invalid_image",
+                  "unauthorized",
+                  "unknown_profile",
+                  "too_large",
+                  "model_unavailable",
+                  "internal"
+                ]
+              },
+              "message": { "type": "string" },
+              "location": {
+                "description": "For profile errors, where the problem is, for example tags[1].pattern.",
+                "type": "string"
+              },
+              "pattern_code": {
+                "description": "For invalid_pattern, the grammar error code (docs/patterns.md).",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

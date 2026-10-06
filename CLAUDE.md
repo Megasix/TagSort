@@ -63,7 +63,7 @@ If a task touches any of these, stop and ask.
 | Project management | `uv`, `pyproject.toml` (`hatchling` build backend) |
 | Quality | `ruff` (lint and format), `mypy --strict`, `pytest`, `pytest-cov` |
 | Inference | `onnxruntime`, `numpy`, `pillow` |
-| Extras | `tagsort[api]` (vision API fallback, model download), `tagsort[server]` (FastAPI), `tagsort[train]` (PaddlePaddle and PaddleOCR training tools, the native framework of the PP-OCR models) |
+| Extras | `tagsort[api]` (vision API fallback, model download), `tagsort[server]` (Starlette and uvicorn; FastAPI was set aside to keep the API contract hand-written in JSON and the dependency tree small), `tagsort[train]` (PaddlePaddle and PaddleOCR training tools, the native framework of the PP-OCR models) |
 | CI | GitHub Actions: lint, type check, tests, license check, engine evaluation |
 | License | Apache 2.0 |
 

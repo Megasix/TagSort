@@ -5,11 +5,16 @@ from jsonschema import Draft202012Validator
 
 from tests.helpers import ROOT, load_schema
 
-SCHEMAS = sorted(path.name for path in (ROOT / "schemas").glob("*.json"))
+SCHEMAS = sorted(
+    path.name
+    for path in (ROOT / "schemas").glob("*.json")
+    if not path.name.endswith(".openapi.json")
+)
 
 
-def test_both_schemas_exist() -> None:
+def test_contracts_exist() -> None:
     assert SCHEMAS == ["profile.v1.json", "result.v1.json"]
+    assert (ROOT / "schemas" / "api.v1.openapi.json").is_file()
 
 
 @pytest.mark.parametrize("name", SCHEMAS)

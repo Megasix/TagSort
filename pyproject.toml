@@ -39,13 +39,17 @@ Repository = "https://github.com/Megasix/TagSort"
 Issues = "https://github.com/Megasix/TagSort/issues"
 
 [project.optional-dependencies]
-# Vision API fallback providers (M2).
+# Vision API providers and model download.
 api = [
     "httpx>=0.28",
 ]
-# HTTP server built on FastAPI (M6).
-server = []
-# PyTorch and training tools (M5). Never imported by the core.
+# HTTP server (Starlette, no telemetry dependency).
+server = [
+    "python-multipart>=0.0.20",
+    "starlette>=0.47",
+    "uvicorn>=0.30",
+]
+# PaddlePaddle and PaddleOCR training tools (M5). Never imported by the core.
 train = []
 
 [dependency-groups]
@@ -144,7 +148,11 @@ addopts = [
     "--cov-report=term-missing",
 ]
 xfail_strict = true
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # Starlette's test client prefers the httpx2 fork; httpx works and is what we ship.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]
 
 [tool.coverage.run]
 branch = true
