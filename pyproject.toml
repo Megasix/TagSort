@@ -28,6 +28,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.scripts]
+tagsort-eval = "tagsort.evaluation.cli:main"
+
 [project.urls]
 Repository = "https://github.com/Megasix/TagSort"
 Issues = "https://github.com/Megasix/TagSort/issues"
@@ -68,6 +71,7 @@ include = [
     "schemas",
     "docs",
     "reference",
+    "eval/reports",
     "LICENSE",
     "NOTICE",
     "README.md",
@@ -107,8 +111,7 @@ known-first-party = ["tagsort", "tests"]
 # Tests feed arbitrary JSON documents to the loaders, so Any is the honest type there.
 "tests/**" = ["D", "ANN401"]
 ".github/scripts/**" = ["T20"]
-# Development tools print their reports.
-"eval/**" = ["T20", "D102", "D103"]
+"src/tagsort/evaluation/cli.py" = ["T20"]
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -116,7 +119,7 @@ docstring-code-format = true
 [tool.mypy]
 strict = true
 python_version = "3.10"
-files = ["src", "tests", ".github/scripts", "eval"]
+files = ["src", "tests", ".github/scripts"]
 warn_unreachable = true
 
 [tool.pytest.ini_options]
