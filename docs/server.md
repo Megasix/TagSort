@@ -92,3 +92,10 @@ Plan about 1 GB per photo read at the same time on top of the base, and set
 Render serves HTTPS and sets `PORT`. Keep the token secret: anyone holding it can send
 photos to the service. Applications such as a web front end should call TagSort from
 their own server, never from the browser with the token.
+
+## Published image
+
+Each release publishes `ghcr.io/megasix/tagsort:<version>` and `:latest` to the GitHub
+Container Registry. On Render, choose **New > Web Service > Existing image** and enter
+`ghcr.io/megasix/tagsort:0.1.0` instead of building from the repository; pin a version
+rather than `latest` so deployments stay reproducible.

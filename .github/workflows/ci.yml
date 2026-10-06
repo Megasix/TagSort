@@ -70,6 +70,21 @@ jobs:
       - name: Pytest with coverage
         run: uv run pytest
 
+  package:
+    name: Package and quickstart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Build the sdist and wheel
+        run: uv build
+      # The M7 exit criterion: the README quickstart works on a clean machine.
+      - name: Follow the README quickstart in a clean virtual environment
+        run: |
+          python3 -m venv /tmp/newcomer
+          source /tmp/newcomer/bin/activate
+          python scripts/check_quickstart.py --wheel "$(ls "$PWD"/dist/*.whl)"
+
   docker:
     name: Docker image
     runs-on: ubuntu-latest

@@ -3,80 +3,114 @@
 Open-source engine that reads handwritten or printed specimen ID tags in photos, in any orientation. Returns tag text, position, angle and a calibrated confidence score. Lightweight ONNX core, versioned JSON contracts and pluggable backends, built to embed in mobile, web and research apps.
 
 [![CI](https://github.com/Megasix/TagSort/actions/workflows/ci.yml/badge.svg)](https://github.com/Megasix/TagSort/actions/workflows/ci.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/Megasix/TagSort/blob/main/LICENSE)
 
-## Status
+TagSort runs on your machine with small open models (6 MB by default): no photo leaves the
+device unless you add a vision API for the tags it is unsure of. It reports a tag as
+`accepted` only when the reading fits the patterns you give it; everything else goes to
+`review`, so a wrong number is never accepted silently.
 
-Early development. Tags are read on the device with small open models (PP-OCRv6, Apache
-2.0), optionally backed by a vision API for doubtful tags. Confidence scores are provisional
-until they are calibrated on more labeled data.
+## Read a tag in five minutes
 
-## Reading tags on the device
+You need Python 3.11 or later.
 
-Download a model once (6 MB for the default `ppocrv6-tiny`; TagSort never downloads on
-its own), then read offline:
-
+<!-- quickstart -->
 ```sh
-pip install "tagsort[api]"      # httpx is only needed to download models
-tagsort models download         # or: tagsort models download ppocrv6-small
-```
-
-```python
-from tagsort import GeminiProvider, LocalPipeline, Profile, Reader
-
-profile = Profile.from_file("museum_a.json")
-reader = Reader(profile)  # local, tiny model, no network
-
-# A bigger model, and Gemini reading only the crop of tags the device is unsure of:
-reader = Reader(
-    profile,
-    backend=LocalPipeline("ppocrv6-small"),
-    fallback=GeminiProvider(api_key=...),
-)
-result = reader.read("IMG_0412.jpg")
-```
-
-The photo never leaves the device; with a fallback, only the crop of a doubtful tag is
-sent. A reading is accepted only if it matches a pattern of the profile.
-See [docs/local.md](docs/local.md) for the models, how a tag is read, and measured results.
-
-## Reading tags through a vision API
-
-Sending whole photos to a vision API needs the `api` extra:
-
-```sh
+# 1. Install TagSort and download the default model (6 MB, checked by SHA-256).
 pip install "tagsort[api]"
+tagsort models download
+
+# 2. Describe your tags: here, "GJ" followed by five digits.
+cat > profile.json <<'EOF'
+{
+  "schema_version": "1.0",
+  "name": "My collection",
+  "tags_per_individual": 1,
+  "tags": [{ "id": "catalog", "pattern": "GJ\\d{5}" }]
+}
+EOF
+
+# 3. Read a photo (here, a sample image) and print the result as JSON.
+curl -sLO https://raw.githubusercontent.com/Megasix/TagSort/main/reference/images/upright.png
+tagsort read upright.png --profile profile.json
 ```
 
+The result lists every tag found, with its text, confidence, status, position and angle:
+
+```json
+{
+  "file": "upright.png",
+  "result": {
+    "schema_version": "1.0",
+    "engine_version": "0.1.0",
+    "model_version": "local:ppocrv6-tiny-1.0",
+    "image": {
+      "width": 1600,
+      "height": 1200,
+      "exif_rotation": 0
+    },
+    "tags": [
+      {
+        "tag_id": "catalog",
+        "text": "GJ07966",
+        "confidence": 0.9847,
+        "status": "accepted",
+        "polygon": [[385.5, 384.7], [739.5, 388.4], [738.2, 508.5], [384.2, 504.7]],
+        "angle": 0.6,
+        "candidates": [
+          {
+            "text": "GJ00966",
+            "confidence": 0.0002
+          },
+          {
+            "text": "GJ07066",
+            "confidence": 0.0001
+          }
+        ],
+        "source": "local"
+      }
+    ],
+    "timings_ms": {
+      "preprocess": 16,
+      "local": 265
+    }
+  }
+}
+```
+
+Run `tagsort read` on a folder to read every photo in it. From Python:
+
 ```python
-import os
+from tagsort import Profile, Reader
 
-from tagsort import GeminiProvider, Profile, Reader
-
-profile = Profile.from_file("museum_a.json")
-provider = GeminiProvider(api_key=os.environ["GEMINI_API_KEY"])  # recommended default
-reader = Reader(profile, backend=provider)
-
-result = reader.read("IMG_0412.jpg")  # path, bytes, PIL image or array
+reader = Reader(Profile.from_file("profile.json"))  # local model, no network
+result = reader.read("upright.png")  # path, bytes, PIL image or array
 for tag in result.tags:
     print(tag.tag_id, tag.text, tag.confidence, tag.status)
 
-print(result.to_json(indent=2))  # conforms to schemas/result.v1.json
-
-# Many photos: read 8 at a time, results in order, constant memory.
-for result in reader.read_batch(paths, workers=8):
+for result in reader.read_batch(paths, workers=8):  # many photos, in order
     ...
 ```
 
-`AnthropicProvider`, `OpenAIProvider` and `DeepSeekProvider` work the same way; see
-[docs/providers.md](docs/providers.md) for measured accuracy, cost and speed of each. The API key always comes from your
-application. Each photo is sent whole to the provider, upright, downscaled and stripped of
-EXIF and GPS metadata. A reading is `accepted` only if it matches a pattern of the profile;
-everything else is marked `review` or `unreadable` so a person can check it.
+## Choosing how to read
+
+| Configuration | Good for | Network |
+| --- | --- | --- |
+| `Reader(profile)`: local `ppocrv6-tiny` model | Mobile and field use, printed tags | None |
+| `Reader(profile, backend=LocalPipeline("ppocrv6-small"))` | Desktops and servers | None |
+| Local model with `fallback=GeminiProvider(api_key=...)` | Older or handwritten tags | Only the crop of doubtful tags |
+| `Reader(profile, backend=GeminiProvider(api_key=...))` | No local model at all | Whole photos (EXIF and GPS removed) |
+
+On the reference set (160 photos, 60 tags), every configuration made zero silent errors;
+`ppocrv6-medium` read 60 of 60 locally, and Gemini Flash-Lite read 60 of 60 for about
+0.51 USD per 1,000 photos. Details:
+[local models](https://github.com/Megasix/TagSort/blob/main/docs/local.md),
+[vision API providers](https://github.com/Megasix/TagSort/blob/main/docs/providers.md),
+[model card](https://github.com/Megasix/TagSort/blob/main/docs/model-card.md).
 
 ## Profiles
 
-A profile describes the tags of one collection: what each kind of tag may say, as a pattern.
+A profile describes the tags of one collection: what each kind of tag may say.
 
 ```json
 {
@@ -90,64 +124,62 @@ A profile describes the tags of one collection: what each kind of tag may say, a
 }
 ```
 
-```python
-from tagsort import Profile
-
-profile = Profile.from_file("museum_a.json")
-profile.match("MD04127")  # "primary"
-profile.match("MD4127")  # None
-```
-
-An invalid profile raises `ProfileError` when it is loaded, with the location of the problem.
-Patterns use a small regex subset that describes a finite set of texts; see
-[docs/patterns.md](docs/patterns.md).
+Patterns use a small regex subset (literals, classes, `\d`, `{n}`, `{n,m}`, alternation)
+that compiles to a finite automaton; an invalid profile is rejected when it is loaded,
+with the location of the problem. See
+[docs/patterns.md](https://github.com/Megasix/TagSort/blob/main/docs/patterns.md).
 
 ## Running as a service
 
-`tagsort serve` (or the Docker image in `docker/`) exposes an HTTP API for applications in
-any language; `tagsort read` reads a folder from the command line. See
-[docs/server.md](docs/server.md) for the endpoints, configuration and deployment on Render.
+`tagsort serve`, or the Docker image, exposes an HTTP API for applications in any language,
+described in [`schemas/api.v1.openapi.json`](https://github.com/Megasix/TagSort/blob/main/schemas/api.v1.openapi.json).
+See [docs/server.md](https://github.com/Megasix/TagSort/blob/main/docs/server.md) for
+configuration and deployment, for example on Render.
 
 ```sh
-docker build -f docker/Dockerfile -t tagsort .
-docker run -v "$PWD:/data" tagsort read /data/photos --profile /data/profile.json
+docker run -p 8000:8000 -e TAGSORT_API_TOKEN=change-me ghcr.io/megasix/tagsort
+docker run -v "$PWD:/data" ghcr.io/megasix/tagsort read /data/photos --profile /data/profile.json
 ```
 
 ## Measuring accuracy on your photos
 
 `tagsort-eval` reads a labeled folder of your photos and reports exact matches, silent
-errors (wrong readings that were accepted), cost and time per photo. See
-[docs/evaluation.md](docs/evaluation.md) for the dataset format and every metric.
+errors, review load, cost and speed. `tagsort-eval prelabel` lets AI fill in the labels for
+a person to check. See [docs/evaluation.md](https://github.com/Megasix/TagSort/blob/main/docs/evaluation.md).
+
+## Contracts and ports
+
+Inputs and outputs follow versioned JSON Schemas, so applications in Dart, TypeScript or any
+other language can use them without reading the Python code:
+[profiles](https://github.com/Megasix/TagSort/blob/main/schemas/profile.v1.json),
+[results](https://github.com/Megasix/TagSort/blob/main/schemas/result.v1.json) and the
+[HTTP API](https://github.com/Megasix/TagSort/blob/main/schemas/api.v1.openapi.json).
+Reference vectors check ports of the
+[pattern grammar](https://github.com/Megasix/TagSort/blob/main/reference/grammar.v1.json)
+and of the [local pipeline](https://github.com/Megasix/TagSort/blob/main/reference/pipeline.v1.json).
+
+## Privacy
+
+TagSort never sends telemetry and never uses the network on its own: models are downloaded
+only when you ask, and photos or crops go to a vision API only when you configure one, with
+your own key.
+
+## Development
+
+TagSort uses [uv](https://docs.astral.sh/uv/):
 
 ```sh
-export GEMINI_API_KEY=...
-tagsort-eval run path/to/dataset --provider gemini --model gemini-3.5-flash-lite
-```
-
-## Contracts
-
-Inputs and outputs are versioned JSON Schemas, so applications in any language can use them
-without reading the Python code:
-
-- [`schemas/profile.v1.json`](schemas/profile.v1.json): profiles;
-- [`schemas/result.v1.json`](schemas/result.v1.json): read results, produced by
-  `ReadResult.to_json()`;
-- [`reference/grammar.v1.json`](reference/grammar.v1.json): test vectors for implementing the
-  pattern grammar in another language.
-
-## Development setup
-
-TagSort uses [uv](https://docs.astral.sh/uv/) and supports Python 3.11 and later.
-
-```sh
-uv python install 3.12
 uv sync --all-extras
+uv run tagsort models download
 uv run pytest
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the quality checks, commit style and dependency
-license policy.
+See [CONTRIBUTING.md](https://github.com/Megasix/TagSort/blob/main/CONTRIBUTING.md) for the
+quality checks, commit style and dependency license policy, and
+[CHANGELOG.md](https://github.com/Megasix/TagSort/blob/main/CHANGELOG.md) for what changed.
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache License 2.0. See [LICENSE](https://github.com/Megasix/TagSort/blob/main/LICENSE) and
+[NOTICE](https://github.com/Megasix/TagSort/blob/main/NOTICE). The default models are
+PP-OCRv6 by PaddlePaddle, also under Apache 2.0.

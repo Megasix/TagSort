@@ -242,5 +242,6 @@ def test_non_json_python_value_is_named() -> None:
 
 def test_readme_example_is_museum_a() -> None:
     readme = (DATA.parents[1] / "README.md").read_text(encoding="utf-8")
-    block = readme.split("```json\n", 1)[1].split("```", 1)[0]
-    assert json.loads(block) == museum_a()
+    blocks = [b.split("```", 1)[0] for b in readme.split("```json\n")[1:]]
+    profiles = [json.loads(b) for b in blocks if '"Museum A"' in b]
+    assert profiles == [museum_a()]

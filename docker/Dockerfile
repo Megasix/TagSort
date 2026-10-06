@@ -19,6 +19,9 @@ RUN /app/.venv/bin/tagsort models download ppocrv6-tiny \
  && /app/.venv/bin/tagsort models download ppocrv6-small
 
 FROM python:3.12-slim
+LABEL org.opencontainers.image.source="https://github.com/Megasix/TagSort" \
+      org.opencontainers.image.description="Reads specimen ID tags in photos" \
+      org.opencontainers.image.licenses="Apache-2.0"
 RUN useradd --create-home --uid 10001 tagsort
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /models /models
