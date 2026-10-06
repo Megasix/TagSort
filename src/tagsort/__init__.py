@@ -1,26 +1,73 @@
 """TagSort: read specimen ID tags in photos.
 
-Only names exported from this module are part of the public API.
+Only names exported from this module are part of the public API. The vision API
+providers (``AnthropicProvider``, ``GeminiProvider``, ``OpenAIProvider``) need the
+``api`` extra: ``pip install "tagsort[api]"``.
 """
 
-from tagsort.errors import PatternError, ProfileError, TagSortError
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any
+
+from tagsort._version import __version__
+from tagsort.errors import ImageError, PatternError, ProfileError, ProviderError, TagSortError
+from tagsort.fallback.base import ProviderTag, Usage, VisionAnswer, VisionProvider, VisionRequest
+from tagsort.pipeline.reader import Reader
 from tagsort.profile import Profile, TagSpec
 from tagsort.types import Candidate, ImageInfo, Point, ReadResult, Tag, TagSource, TagStatus
 
+if TYPE_CHECKING:
+    from tagsort.fallback.anthropic import AnthropicProvider
+    from tagsort.fallback.gemini import GeminiProvider
+    from tagsort.fallback.openai import OpenAIProvider
+
 __all__ = [
+    "AnthropicProvider",
     "Candidate",
+    "GeminiProvider",
+    "ImageError",
     "ImageInfo",
+    "OpenAIProvider",
     "PatternError",
     "Point",
     "Profile",
     "ProfileError",
+    "ProviderError",
+    "ProviderTag",
     "ReadResult",
+    "Reader",
     "Tag",
     "TagSortError",
     "TagSource",
     "TagSpec",
     "TagStatus",
+    "Usage",
+    "VisionAnswer",
+    "VisionProvider",
+    "VisionRequest",
     "__version__",
 ]
 
-__version__ = "0.0.1"
+logging.getLogger("tagsort").addHandler(logging.NullHandler())
+
+_PROVIDERS = {
+    "AnthropicProvider": "tagsort.fallback.anthropic",
+    "GeminiProvider": "tagsort.fallback.gemini",
+    "OpenAIProvider": "tagsort.fallback.openai",
+}
+
+
+def __getattr__(name: str) -> Any:  # noqa: ANN401
+    """Import provider classes on first use, so the core does not need httpx."""
+    if name not in _PROVIDERS:
+        raise AttributeError(f"module 'tagsort' has no attribute {name!r}")
+    from importlib import import_module
+
+    try:
+        module = import_module(_PROVIDERS[name])
+    except ModuleNotFoundError as error:
+        if error.name != "httpx":
+            raise
+        raise ImportError(f"{name} needs the 'api' extra: pip install \"tagsort[api]\"") from None
+    return getattr(module, name)
