@@ -22,10 +22,10 @@ pip install "tagsort[api]"
 ```python
 import os
 
-from tagsort import AnthropicProvider, Profile, Reader
+from tagsort import GeminiProvider, Profile, Reader
 
 profile = Profile.from_file("museum_a.json")
-provider = AnthropicProvider(api_key=os.environ["ANTHROPIC_API_KEY"])
+provider = GeminiProvider(api_key=os.environ["GEMINI_API_KEY"])  # recommended default
 reader = Reader(profile, backend=provider)
 
 result = reader.read("IMG_0412.jpg")  # path, bytes, PIL image or array
@@ -39,7 +39,8 @@ for result in reader.read_batch(paths, workers=8):
     ...
 ```
 
-`OpenAIProvider` and `GeminiProvider` work the same way. The API key always comes from your
+`AnthropicProvider`, `OpenAIProvider` and `DeepSeekProvider` work the same way; see
+[docs/providers.md](docs/providers.md) for measured accuracy, cost and speed of each. The API key always comes from your
 application. Each photo is sent whole to the provider, upright, downscaled and stripped of
 EXIF and GPS metadata. A reading is `accepted` only if it matches a pattern of the profile;
 everything else is marked `review` or `unreadable` so a person can check it.

@@ -25,7 +25,9 @@ class GeminiProvider(HttpProvider):
     name = "gemini"
     # Gemini is trained to report boxes as [y_min, x_min, y_max, x_max] on a 0-1000 scale.
     box_format: BoxFormat = "normalized_yxyx"
-    default_model = "gemini-3.1-pro-preview"
+    # Measured on lot-02 (eval/reports): as accurate as larger models, fastest and among
+    # the cheapest. See docs/providers.md.
+    default_model = "gemini-3.5-flash-lite"
     default_max_side = 2048
     base_url = "https://generativelanguage.googleapis.com/v1beta"
 
