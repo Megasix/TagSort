@@ -38,6 +38,8 @@ PROPRIETARY = "License :: Other/Proprietary License"
         "(MIT OR GPL-3.0-only) AND ISC",
         "mit or isc",
         "mit",
+        "MIT-CMU",  # Pillow
+        "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",  # numpy
     ],
 )
 def test_allowed_expressions(expression: str) -> None:
@@ -55,6 +57,9 @@ def test_allowed_expressions(expression: str) -> None:
         "MIT AND LicenseRef-Proprietary",
         "Apache-2.0 WITH LLVM-exception",
         "(MIT OR GPL-3.0-only) AND SSPL-1.0",
+        "CC-BY-NC-4.0",
+        "CC-BY-SA-4.0",
+        "OpenRAIL",
     ],
 )
 def test_rejected_expressions(expression: str) -> None:

@@ -27,6 +27,10 @@ ALLOWED_SPDX = frozenset(
     {
         "MIT",
         "MIT-0",
+        "MIT-CMU",
+        "HPND",
+        "Zlib",
+        "CC0-1.0",
         "BSD-2-Clause",
         "BSD-3-Clause",
         "0BSD",
@@ -42,6 +46,9 @@ ALLOWED_CLASSIFIERS = frozenset(
     {
         "License :: OSI Approved :: MIT License",
         "License :: OSI Approved :: MIT No Attribution License (MIT-0)",
+        "License :: OSI Approved :: Historical Permission Notice and Disclaimer (HPND)",
+        "License :: OSI Approved :: zlib/libpng License",
+        "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
         "License :: OSI Approved :: BSD License",
         "License :: OSI Approved :: Apache Software License",
         "License :: OSI Approved :: ISC License (ISCL)",
@@ -58,6 +65,7 @@ NEUTRAL_CLASSIFIERS = frozenset({"License :: OSI Approved"})
 ALLOWED_LICENSE_NAMES = _ALLOWED_SPDX_LOWER | frozenset(
     {
         "mit license",
+        "zlib license",
         "bsd",
         "bsd license",
         "new bsd license",
