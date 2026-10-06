@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0",
+  "name": "Museum A",
+  "tags_per_individual": 2,
+  "tags": [
+    { "id": "primary", "pattern": "MD\\d{5}" },
+    { "id": "secondary", "pattern": "[A-Z]{2}-\\d{3,4}" }
+  ]
+}
