@@ -21,6 +21,7 @@ def test_public_api() -> None:
     assert tagsort.__all__ == [
         "AnthropicProvider",
         "Candidate",
+        "DeepSeekProvider",
         "GeminiProvider",
         "ImageError",
         "ImageInfo",

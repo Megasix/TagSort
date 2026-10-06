@@ -55,5 +55,6 @@ def test_prefilled_file_has_no_labels_yet(tmp_path: Path) -> None:
 
 
 def test_prices_cover_default_models() -> None:
-    for cls, _ in try_batch.PROVIDERS.values():
-        assert cls.default_model in try_batch.PRICES
+    # DeepSeek's pricing page could not be read on 2026-10-06; its cost is reported as unknown.
+    for name, (cls, _) in try_batch.PROVIDERS.items():
+        assert cls.default_model in try_batch.PRICES or name == "deepseek"
