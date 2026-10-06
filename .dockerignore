@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+**/__pycache__
+*.egg-info
+dist
+build
+tests
+eval
+reference
+docs
+scripts
+training
+TagSort-data
+*.env

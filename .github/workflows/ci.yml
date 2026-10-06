@@ -70,6 +70,38 @@ jobs:
       - name: Pytest with coverage
         run: uv run pytest
 
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the image
+        run: docker build -f docker/Dockerfile -t tagsort .
+      # The M6 exit criterion: read a folder with no Python installed on the host.
+      - name: Read the reference images
+        run: |
+          python3 -c "import json; json.dump(json.load(open('reference/pipeline.v1.json'))['profile'], open('reference/profile.json', 'w'))"
+          docker run --rm -v "$PWD/reference:/data:ro" tagsort read /data/images --profile /data/profile.json --model ppocrv6-tiny > out.jsonl
+          python3 - <<'PY'
+          import json
+          lines = [json.loads(line) for line in open("out.jsonl")]
+          texts = {line["file"].rsplit("/", 1)[-1]: [t["text"] for t in line["result"]["tags"]] for line in lines}
+          print(texts)
+          assert texts["upright.png"] == ["GJ07966"], texts
+          assert texts["no_tag.png"] == [], texts
+          assert len(lines) == 7
+          PY
+      - name: Serve and answer a request
+        run: |
+          docker run -d --name server -p 8000:8000 -e TAGSORT_API_TOKEN=ci-token tagsort
+          for i in $(seq 1 30); do curl -sf localhost:8000/v1/health && break; sleep 1; done
+          curl -sf -H "Authorization: Bearer ci-token" \
+            -F image=@reference/images/upright.png -F "profile=<reference/profile.json" \
+            localhost:8000/v1/read | tee response.json
+          python3 -c "import json; tags = json.load(open('response.json'))['tags']; assert [t['text'] for t in tags] == ['GJ07966'], tags"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -F image=@reference/images/upright.png localhost:8000/v1/read)" = 401
+          docker rm -f server
+
   license:
     name: License check
     runs-on: ubuntu-latest
