@@ -33,6 +33,10 @@ for tag in result.tags:
     print(tag.tag_id, tag.text, tag.confidence, tag.status)
 
 print(result.to_json(indent=2))  # conforms to schemas/result.v1.json
+
+# Many photos: read 8 at a time, results in order, constant memory.
+for result in reader.read_batch(paths, workers=8):
+    ...
 ```
 
 `OpenAIProvider` and `GeminiProvider` work the same way. The API key always comes from your

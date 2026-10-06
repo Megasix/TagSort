@@ -48,6 +48,8 @@ class Report:
     price_per_million: tuple[float, float] | None
     created: str = ""
     prelabeled_with: tuple[str, ...] = ()
+    workers: int = 1
+    photos_per_minute: float | None = None
 
     @property
     def cost_per_1000_photos(self) -> float | None:
@@ -77,6 +79,8 @@ class Report:
             ),
             "cost_per_1000_photos_usd": self.cost_per_1000_photos,
             "prelabeled_with": list(self.prelabeled_with),
+            "workers": self.workers,
+            "photos_per_minute": self.photos_per_minute,
         }
 
     def to_markdown(self) -> str:
@@ -102,7 +106,13 @@ class Report:
             ("Missed tags", str(m.missed_tags)),
             ("Invented tags", str(m.invented_tags)),
             ("Share read by the fallback", f"{m.fallback_share:.0%}"),
-            ("Time per photo", f"{m.seconds_per_photo:.1f} s"),
+            ("Time per photo (one request)", f"{m.seconds_per_photo:.1f} s"),
+            (
+                f"Throughput ({self.workers} worker{'s' if self.workers > 1 else ''})",
+                f"{self.photos_per_minute:.0f} photos per minute"
+                if self.photos_per_minute
+                else "not measured (answers from the cache)",
+            ),
             ("Cost per 1,000 photos", f"${cost:.2f}" if cost is not None else "unknown"),
         ]
         lines = [

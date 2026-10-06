@@ -222,3 +222,36 @@ def test_cli_errors(
     root = dataset(tmp_path / "d")
     assert cli.main(["run", str(root), "--provider", "openai", "--split", "nope"]) == 2
     assert "no labeled photo" in capsys.readouterr().err
+
+
+def test_parallel_run_records_usage_per_photo(tmp_path: Path) -> None:
+    root = dataset(tmp_path)
+    images = load_dataset(root)
+    provider = FakeProvider(texts={60: "GJ07966", 70: "GJ07967"})
+    cache = root / "predictions" / "fake"
+    seen: list[int] = []
+    result = run_dataset(
+        images,
+        profile=Profile.from_dict(PROFILE),
+        provider=provider,
+        cache=cache,
+        workers=3,
+        progress=lambda i, n, o: seen.append(i),
+    )
+    assert seen == [1, 2, 3], "progress follows the order of the photos"
+    assert result.read_now == 3
+    assert result.wall_seconds > 0
+    usage = json.loads((cache / "_usage.json").read_text())
+    assert usage == {name: [1000, 50] for name in ("a.jpg", "b.jpg", "c.jpg")}
+    again = run_dataset(
+        images, profile=Profile.from_dict(PROFILE), provider=provider, cache=cache, workers=3
+    )
+    assert again.read_now == 0
+
+
+def test_report_throughput() -> None:
+    measured = report(workers=8, photos_per_minute=240.0)
+    assert "| Throughput (8 workers) | 240 photos per minute |" in measured.to_markdown()
+    assert measured.to_dict()["photos_per_minute"] == 240.0
+    assert "not measured" in report().to_markdown()
+    assert "(1 worker)" in report().to_markdown()

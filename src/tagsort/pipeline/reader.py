@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Iterable, Iterator
+from collections import deque
+from collections.abc import Generator, Iterable
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 
 from tagsort._version import __version__
@@ -105,14 +107,42 @@ class Reader:
             },
         )
 
-    def read_batch(self, images: Iterable[ImageSource]) -> Iterator[ReadResult]:
-        """Read images one at a time, yielding each result as soon as it is ready.
+    def read_batch(
+        self, images: Iterable[ImageSource], *, workers: int = 1
+    ) -> Generator[ReadResult, None, None]:
+        """Read images, yielding results in the order of ``images``.
 
-        Only one image is held in memory at a time. An error stops the batch; call
-        :meth:`read` in a loop to handle errors image by image.
+        Args:
+            images: Images to read; consumed lazily.
+            workers: Images read at the same time. Vision APIs answer in seconds, so
+                several workers cut the total time almost proportionally, within the
+                provider's rate limits (rate-limited requests are retried).
+
+        At most ``2 * workers`` images are in flight, so memory stays constant however
+        long the batch. An error stops the batch; call :meth:`read` in a loop to
+        handle errors image by image.
+
+        Raises:
+            ValueError: If ``workers`` is below 1.
         """
-        for image in images:
-            yield self.read(image)
+        if workers < 1:
+            raise ValueError(f"workers must be at least 1, not {workers}")
+        if workers == 1:
+            for image in images:
+                yield self.read(image)
+            return
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="tagsort") as pool:
+            pending: deque[Future[ReadResult]] = deque()
+            try:
+                for image in images:
+                    pending.append(pool.submit(self.read, image))
+                    if len(pending) >= 2 * workers:
+                        yield pending.popleft().result()
+                while pending:
+                    yield pending.popleft().result()
+            finally:
+                for future in pending:
+                    future.cancel()
 
     def _to_tag(self, raw: ProviderTag, prepared: PreparedImage) -> Tag:
         raw = self._flag_upside_down_ambiguity(raw)
