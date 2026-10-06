@@ -18,6 +18,32 @@ hold aggregate numbers only, never tag texts or photos.
 `compare` exits with status 1 when the new report has a lower exact match rate or a higher
 silent error rate than the base report (`--tolerance` allows an absolute margin).
 
+## Pre-labeling a new dataset
+
+Typing every tag by hand is slow. `prelabel` lets one or two AI backends fill in the
+labels, then a person checks them:
+
+```sh
+export GEMINI_API_KEY=... OPENAI_API_KEY=...
+uv run tagsort-eval prelabel path/to/dataset            # gemini flash-lite + gpt-6-luna
+uv run tagsort-eval prelabel path/to/dataset --with anthropic:claude-sonnet-5-5
+```
+
+It writes `labels.csv` (texts pre-filled, `verified` empty), `review.html` and
+`prelabel.json` in the dataset folder. Open `review.html` in a browser: rows where the two
+AIs disagree or are unsure come first, then photos where nothing was found (look for
+missed tags). Correct each text, tick **verified**, export, and put the exported
+`labels.csv` in the dataset folder. Progress is kept in the browser between visits.
+
+Only photos whose rows are all verified count in evaluations. Pre-filled labels make it
+easy to accept an AI mistake without looking, which would make that AI's scores look
+better than they are; reports therefore name the pre-labeling models and flag their
+scores as optimistic. Answers are cached, so evaluating those models afterwards costs
+nothing more.
+
+This page is a development and training tool, not an application review screen
+(CLAUDE.md §4).
+
 ## Dataset format
 
 ```
@@ -41,13 +67,14 @@ One JSON object per line, one line per tag:
 | `split` | no | Split name, for example `train` or `test` |
 | `tag_id` | no | Profile tag id |
 | `polygon` | no | Corners of the tag, `[[x, y], ...]`, in original pixels after EXIF rotation |
+| `verified` | no | When the column exists, only photos whose rows are all `true` (or `yes`) count |
 
 A photo with two tags has two lines. A photo without a tag has one line without `text`.
 
 ### `labels.csv`
 
-The same fields as columns (`image,session,tag_id,text,notes`), comma- or
-semicolon-separated, for labels filled in a spreadsheet. Rows whose text is still the
+The same fields as columns (`image,session,tag_id,text,verified,notes`), comma- or
+semicolon-separated (`verified`: `yes`, `oui`, `x`, `1` or `true`), for labels filled in a spreadsheet. Rows whose text is still the
 placeholder `A_REMPLIR` are not labeled yet and are skipped.
 
 ### Splits

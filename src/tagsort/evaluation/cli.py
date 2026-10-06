@@ -1,6 +1,7 @@
 """The ``tagsort-eval`` command.
 
     tagsort-eval run DATASET --provider gemini [--model M] [--split test] [--limit N]
+    tagsort-eval prelabel DATASET [--with gemini:gemini-3.5-flash-lite] [--with openai]
     tagsort-eval compare BASE.json NEW.json [--tolerance 0.01]
 
 ``run`` reads the API key from the environment (ANTHROPIC_API_KEY, OPENAI_API_KEY,
@@ -22,8 +23,10 @@ from pathlib import Path
 from tagsort.errors import TagSortError
 from tagsort.evaluation.dataset import load_dataset
 from tagsort.evaluation.metrics import ImageOutcome, summarize
+from tagsort.evaluation.prelabel import PRELABEL_FILE, prelabel
 from tagsort.evaluation.report import PRICES, Report, compare
 from tagsort.evaluation.run import run_dataset
+from tagsort.fallback._http import HttpProvider
 from tagsort.profile import Profile
 
 __all__ = ["main"]
@@ -60,6 +63,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="USD per million input and output tokens",
     )
 
+    pre = commands.add_parser(
+        "prelabel", help="pre-fill labels with AI readings and write a review page"
+    )
+    pre.add_argument("dataset", type=Path, help="folder with photos/ and profile.json")
+    pre.add_argument(
+        "--with",
+        dest="backends",
+        action="append",
+        metavar="PROVIDER[:MODEL]",
+        help="backend to pre-label with, once or twice (default: gemini:gemini-3.5-flash-lite "
+        "and openai:gpt-6-luna)",
+    )
+    pre.add_argument("--overwrite", action="store_true", help="replace an existing labels.csv")
+
     comparison = commands.add_parser("compare", help="fail if NEW regresses against BASE")
     comparison.add_argument("base", type=Path)
     comparison.add_argument("new", type=Path)
@@ -69,6 +86,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "compare":
             return _compare(args)
+        if args.command == "prelabel":
+            return _prelabel(args)
         return _run(args)
     except (TagSortError, OSError) as error:
         print(f"tagsort-eval: {error}", file=sys.stderr)
@@ -86,20 +105,55 @@ def _compare(args: argparse.Namespace) -> int:
     return 1 if problems else 0
 
 
-def _run(args: argparse.Namespace) -> int:
-    from tagsort import AnthropicProvider, DeepSeekProvider, GeminiProvider, OpenAIProvider
+def _provider(name: str, model: str | None) -> HttpProvider:
+    """Build a provider with its key from the environment."""
+    import tagsort
 
-    classes = {
-        "anthropic": AnthropicProvider,
-        "deepseek": DeepSeekProvider,
-        "gemini": GeminiProvider,
-        "openai": OpenAIProvider,
-    }
-    variable = KEY_VARIABLES[args.provider]
-    key = os.environ.get(variable)
+    if name not in KEY_VARIABLES:
+        raise TagSortError(f"unknown provider {name!r}; choose from {', '.join(KEY_VARIABLES)}")
+    key = os.environ.get(KEY_VARIABLES[name])
     if not key:
-        print(f"tagsort-eval: {variable} is not set", file=sys.stderr)
+        raise TagSortError(f"{KEY_VARIABLES[name]} is not set")
+    cls = getattr(tagsort, f"{_CLASS_NAMES[name]}Provider")
+    provider: HttpProvider = cls(api_key=key, model=model)
+    return provider
+
+
+_CLASS_NAMES = {
+    "anthropic": "Anthropic",
+    "deepseek": "DeepSeek",
+    "gemini": "Gemini",
+    "openai": "OpenAI",
+}
+DEFAULT_PRELABEL = ("gemini:gemini-3.5-flash-lite", "openai:gpt-6-luna")
+
+
+def _prelabel(args: argparse.Namespace) -> int:
+    specs = args.backends or list(DEFAULT_PRELABEL)
+    if len(specs) > 2:
+        print("tagsort-eval: give --with once or twice", file=sys.stderr)
         return 2
+    profile = Profile.from_file(args.dataset / "profile.json")
+    providers = []
+    for spec in specs:
+        name, _, model = spec.partition(":")
+        providers.append(_provider(name, model or None))
+    try:
+        rows = prelabel(
+            args.dataset, profile=profile, providers=providers, overwrite=args.overwrite
+        )
+    finally:
+        for provider in providers:
+            provider.close()
+    first = sum(row.priority < 3 for row in rows)
+    print(f"{len(rows)} rows written to {args.dataset / 'labels.csv'}; {first} need a close look.")
+    print(f"Open {args.dataset / 'review.html'} in a browser to check them.")
+    return 0
+
+
+def _run(args: argparse.Namespace) -> int:
+    if not os.environ.get(KEY_VARIABLES[args.provider]):
+        raise TagSortError(f"{KEY_VARIABLES[args.provider]} is not set")
 
     dataset: Path = args.dataset
     profile = Profile.from_file(dataset / "profile.json")
@@ -108,7 +162,7 @@ def _run(args: argparse.Namespace) -> int:
         print("tagsort-eval: no labeled photo to evaluate", file=sys.stderr)
         return 2
 
-    with classes[args.provider](api_key=key, model=args.model) as provider:
+    with _provider(args.provider, args.model) as provider:
         model = provider.model
         cache = dataset / "predictions" / f"{args.provider}-{model}"
 
@@ -129,6 +183,12 @@ def _run(args: argparse.Namespace) -> int:
             progress=progress,
         )
 
+    prelabel_file = dataset / PRELABEL_FILE
+    prelabeled_with: list[str] = (
+        json.loads(prelabel_file.read_text(encoding="utf-8"))["models"]
+        if prelabel_file.is_file()
+        else []
+    )
     price: tuple[float, float] | None = (
         (args.price[0], args.price[1]) if args.price else PRICES.get(model)
     )
@@ -142,6 +202,7 @@ def _run(args: argparse.Namespace) -> int:
         output_tokens=result.output_tokens,
         price_per_million=price,
         created=dt.date.today().isoformat(),
+        prelabeled_with=tuple(prelabeled_with),
     )
     args.reports.mkdir(parents=True, exist_ok=True)
     stem = _slug(f"{report.created}_{report.dataset}_{args.split or 'all'}_{args.provider}-{model}")

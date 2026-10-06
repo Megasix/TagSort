@@ -47,6 +47,7 @@ class Report:
     output_tokens: int
     price_per_million: tuple[float, float] | None
     created: str = ""
+    prelabeled_with: tuple[str, ...] = ()
 
     @property
     def cost_per_1000_photos(self) -> float | None:
@@ -75,6 +76,7 @@ class Report:
                 else None
             ),
             "cost_per_1000_photos_usd": self.cost_per_1000_photos,
+            "prelabeled_with": list(self.prelabeled_with),
         }
 
     def to_markdown(self) -> str:
@@ -114,6 +116,18 @@ class Report:
             "| --- | --- |",
             *(f"| {name} | {value} |" for name, value in rows),
         ]
+        backend = f"{self.provider}:{self.model}"
+        if self.prelabeled_with:
+            lines += [
+                "",
+                f"Labels were pre-filled by {', '.join(self.prelabeled_with)} and checked by a "
+                "person. "
+                + (
+                    "**This backend pre-filled them, so its scores are optimistic.**"
+                    if backend in self.prelabeled_with
+                    else "Scores of those models are optimistic."
+                ),
+            ]
         if len(m.sessions) > 1:
             lines += [
                 "",
