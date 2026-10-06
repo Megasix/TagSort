@@ -62,3 +62,14 @@ model reads it and, as the vision APIs do, sends it to review.
   available. Fine-tuning on field data (M5) is expected to close the remaining gap.
 - **Server, archive or old specimens** (more handwriting): `ppocrv6-small` or
   `ppocrv6-medium`, with a Gemini Flash-Lite fallback for tags the model cannot read.
+
+## Porting to another language
+
+Applications in Dart (Flutter) or JavaScript run the same ONNX files with ONNX Runtime.
+To check a port, use the reference vectors in
+[`reference/pipeline.v1.json`](../reference/pipeline.v1.json): seven synthetic images
+(`reference/images/`) with the profile, the detected boxes, every line's readings and
+probabilities, and the final tags. A port must reproduce texts, tag ids and statuses
+exactly, and numbers within the stated tolerances. The pattern grammar has its own
+vectors in [`reference/grammar.v1.json`](../reference/grammar.v1.json).
+`scripts/make_reference.py` regenerates the vectors when a model or the pipeline changes.
