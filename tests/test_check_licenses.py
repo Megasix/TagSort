@@ -93,7 +93,9 @@ def test_classifiers_take_precedence_over_license_field() -> None:
     assert check.license_problem(None, [MIT], full_text) is None
 
 
-@pytest.mark.parametrize("field", ["MIT", "BSD License", "Apache License, Version 2.0", " isc "])
+@pytest.mark.parametrize(
+    "field", ["MIT", "BSD License", "Apache License, Version 2.0", " isc ", "3-Clause BSD License"]
+)
 def test_license_field_exact_names_are_allowed(field: str) -> None:
     assert check.license_problem(None, [], field) is None
 

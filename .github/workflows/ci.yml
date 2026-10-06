@@ -58,6 +58,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: uv sync --all-extras
+      # The smallest model (6 MB) lets tests run the real recognizer. It is downloaded
+      # explicitly, checked against its manifest SHA-256, and cached between runs.
+      - name: Cache models
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/tagsort/models
+          key: models-${{ hashFiles('src/tagsort/models/manifests/*.json') }}
+      - name: Download the test model
+        run: uv run tagsort models download ppocrv6-tiny
       - name: Pytest with coverage
         run: uv run pytest
 
