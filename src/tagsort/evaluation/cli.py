@@ -21,12 +21,13 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from tagsort.errors import TagSortError
-from tagsort.evaluation.dataset import load_dataset
+from tagsort.evaluation.dataset import LabeledImage, load_dataset
 from tagsort.evaluation.metrics import ImageOutcome, summarize
 from tagsort.evaluation.prelabel import PRELABEL_FILE, prelabel
 from tagsort.evaluation.report import PRICES, Report, compare
-from tagsort.evaluation.run import run_dataset
+from tagsort.evaluation.run import RunResult, run_dataset
 from tagsort.fallback._http import HttpProvider
+from tagsort.models import DEFAULT_MODEL
 from tagsort.profile import Profile
 
 __all__ = ["main"]
@@ -48,8 +49,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     run = commands.add_parser("run", help="read a labeled dataset and write a report")
     run.add_argument("dataset", type=Path, help="folder with photos/, labels and profile.json")
-    run.add_argument("--provider", required=True, choices=sorted(KEY_VARIABLES))
-    run.add_argument("--model", help="model to use instead of the provider's default")
+    run.add_argument("--provider", required=True, choices=["local", *sorted(KEY_VARIABLES)])
+    run.add_argument(
+        "--model", help="model instead of the default (with local: a model from `tagsort models`)"
+    )
+    run.add_argument(
+        "--fallback",
+        metavar="PROVIDER[:MODEL]",
+        help="with --provider local: API reading the crop of every tag not accepted locally",
+    )
     run.add_argument("--split", help="evaluate only this split, for example test")
     run.add_argument("--limit", type=int, help="read only the first N photos")
     run.add_argument("--force", action="store_true", help="read again photos already cached")
@@ -158,51 +166,103 @@ def _prelabel(args: argparse.Namespace) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
+    if args.provider == "local":
+        return _run_local(args)
+    if args.fallback:
+        raise TagSortError("--fallback needs --provider local")
     if not os.environ.get(KEY_VARIABLES[args.provider]):
         raise TagSortError(f"{KEY_VARIABLES[args.provider]} is not set")
-
-    dataset: Path = args.dataset
-    profile = Profile.from_file(dataset / "profile.json")
-    images = load_dataset(dataset, split=args.split)[: args.limit]
+    profile, images = _load(args)
     if not images:
-        print("tagsort-eval: no labeled photo to evaluate", file=sys.stderr)
-        return 2
-
+        return _no_photo()
     with _provider(args.provider, args.model) as provider:
         model = provider.model
-        cache = dataset / "predictions" / f"{args.provider}-{model}"
-
-        def progress(index: int, total: int, outcome: ImageOutcome) -> None:
-            if outcome.error:
-                status = f"ERROR {outcome.error}"
-            else:
-                read = [t for _, t in outcome.pairs if t is not None] + list(outcome.invented)
-                status = ", ".join(f"{t.text or '-'} ({t.status})" for t in read) or "no tag"
-            print(f"[{index}/{total}] {outcome.image}: {status}"[:200])
-
         result = run_dataset(
             images,
             profile=profile,
             provider=provider,
-            cache=cache,
+            cache=args.dataset / "predictions" / f"{args.provider}-{model}",
             force=args.force,
             workers=args.workers,
-            progress=progress,
+            progress=_progress,
         )
+    price = (args.price[0], args.price[1]) if args.price else PRICES.get(model)
+    return _report(args, result, args.provider, model, price)
 
+
+def _run_local(args: argparse.Namespace) -> int:
+    from tagsort.pipeline.local import LocalPipeline
+
+    fallback = None
+    if args.fallback:
+        name, _, fallback_model = args.fallback.partition(":")
+        fallback = _provider(name, fallback_model or None)
+    profile, images = _load(args)
+    if not images:
+        return _no_photo()
+    local = LocalPipeline(args.model or DEFAULT_MODEL)
+    model = local.model + (f"+{fallback.name}-{fallback.model}" if fallback else "")
+    try:
+        result = run_dataset(
+            images,
+            profile=profile,
+            local=local,
+            fallback=fallback,
+            cache=args.dataset / "predictions" / f"local-{model}",
+            force=args.force,
+            workers=args.workers,
+            progress=_progress,
+        )
+    finally:
+        if fallback is not None:
+            fallback.close()
+    if args.price:
+        price: tuple[float, float] | None = (args.price[0], args.price[1])
+    elif fallback is not None:
+        price = PRICES.get(fallback.model)
+    else:
+        price = (0.0, 0.0)  # reading on the device costs no API tokens
+    return _report(args, result, "local", model, price)
+
+
+def _load(args: argparse.Namespace) -> tuple[Profile, list[LabeledImage]]:
+    dataset: Path = args.dataset
+    profile = Profile.from_file(dataset / "profile.json")
+    return profile, load_dataset(dataset, split=args.split)[: args.limit]
+
+
+def _no_photo() -> int:
+    print("tagsort-eval: no labeled photo to evaluate", file=sys.stderr)
+    return 2
+
+
+def _progress(index: int, total: int, outcome: ImageOutcome) -> None:
+    if outcome.error:
+        status = f"ERROR {outcome.error}"
+    else:
+        read = [t for _, t in outcome.pairs if t is not None] + list(outcome.invented)
+        status = ", ".join(f"{t.text or '-'} ({t.status})" for t in read) or "no tag"
+    print(f"[{index}/{total}] {outcome.image}: {status}"[:200])
+
+
+def _report(
+    args: argparse.Namespace,
+    result: RunResult,
+    provider: str,
+    model: str,
+    price: tuple[float, float] | None,
+) -> int:
+    dataset: Path = args.dataset
     prelabel_file = dataset / PRELABEL_FILE
     prelabeled_with: list[str] = (
         json.loads(prelabel_file.read_text(encoding="utf-8"))["models"]
         if prelabel_file.is_file()
         else []
     )
-    price: tuple[float, float] | None = (
-        (args.price[0], args.price[1]) if args.price else PRICES.get(model)
-    )
     report = Report(
         dataset=args.name or dataset.name,
         split=args.split,
-        provider=args.provider,
+        provider=provider,
         model=model,
         metrics=summarize(result.outcomes),
         input_tokens=result.input_tokens,
@@ -218,7 +278,7 @@ def _run(args: argparse.Namespace) -> int:
         ),
     )
     args.reports.mkdir(parents=True, exist_ok=True)
-    stem = _slug(f"{report.created}_{report.dataset}_{args.split or 'all'}_{args.provider}-{model}")
+    stem = _slug(f"{report.created}_{report.dataset}_{args.split or 'all'}_{provider}-{model}")
     (args.reports / f"{stem}.json").write_text(
         json.dumps(report.to_dict(), indent=2) + "\n", encoding="utf-8"
     )

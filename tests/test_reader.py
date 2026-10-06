@@ -185,8 +185,12 @@ def test_reader_is_thread_safe() -> None:
 def test_reader_validation() -> None:
     with pytest.raises(TypeError, match="profile must be a Profile"):
         Reader({"name": "x"}, backend=FakeProvider())  # type: ignore[arg-type]
-    with pytest.raises(TypeError, match="backend must be a VisionProvider"):
-        Reader(PROFILE, backend="local")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="backend must be 'local', a LocalPipeline"):
+        Reader(PROFILE, backend="api")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="only used with the local backend"):
+        Reader(PROFILE, backend=FakeProvider(), fallback=FakeProvider())
+    with pytest.raises(TypeError, match="fallback must be a VisionProvider"):
+        Reader(PROFILE, backend=FakeProvider(), fallback="gemini")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="thresholds"):
         Reader(PROFILE, backend=FakeProvider(), accept_threshold=0.2, review_threshold=0.5)
     assert Reader(PROFILE, backend=FakeProvider()).profile is PROFILE

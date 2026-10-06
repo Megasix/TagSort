@@ -7,13 +7,41 @@ Open-source engine that reads handwritten or printed specimen ID tags in photos,
 
 ## Status
 
-Early development. Tags can be read through a vision API (Anthropic, OpenAI or Google); the
-on-device models come in a later milestone. Confidence scores are provisional until they are
-calibrated on labeled data.
+Early development. Tags are read on the device with small open models (PP-OCRv6, Apache
+2.0), optionally backed by a vision API for doubtful tags. Confidence scores are provisional
+until they are calibrated on more labeled data.
 
-## Reading tags
+## Reading tags on the device
 
-Reading through a vision API needs the `api` extra:
+Download a model once (6 MB for the default `ppocrv6-tiny`; TagSort never downloads on
+its own), then read offline:
+
+```sh
+pip install "tagsort[api]"      # httpx is only needed to download models
+tagsort models download         # or: tagsort models download ppocrv6-small
+```
+
+```python
+from tagsort import GeminiProvider, LocalPipeline, Profile, Reader
+
+profile = Profile.from_file("museum_a.json")
+reader = Reader(profile)  # local, tiny model, no network
+
+# A bigger model, and Gemini reading only the crop of tags the device is unsure of:
+reader = Reader(
+    profile,
+    backend=LocalPipeline("ppocrv6-small"),
+    fallback=GeminiProvider(api_key=...),
+)
+result = reader.read("IMG_0412.jpg")
+```
+
+The photo never leaves the device; with a fallback, only the crop of a doubtful tag is
+sent. A reading is accepted only if it matches a pattern of the profile.
+
+## Reading tags through a vision API
+
+Sending whole photos to a vision API needs the `api` extra:
 
 ```sh
 pip install "tagsort[api]"

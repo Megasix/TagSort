@@ -16,6 +16,7 @@ from tagsort.errors import TagSortError
 from tagsort.evaluation.dataset import LabeledImage
 from tagsort.evaluation.metrics import ImageOutcome, match_tags
 from tagsort.fallback.base import BoxFormat, Usage, VisionAnswer, VisionProvider, VisionRequest
+from tagsort.pipeline.local import LocalPipeline
 from tagsort.pipeline.reader import Reader
 from tagsort.profile import Profile
 from tagsort.types import Candidate, Tag
@@ -64,14 +65,22 @@ class CountingProvider:
     def read(self, request: VisionRequest) -> VisionAnswer:
         """Read through the wrapped provider and add up the tokens."""
         answer = self.inner.read(request)
-        self._local.usage = answer.usage
+        spent = getattr(self._local, "usage", Usage())
+        self._local.usage = Usage(
+            spent.input_tokens + answer.usage.input_tokens,
+            spent.output_tokens + answer.usage.output_tokens,
+        )
         with self._lock:
             self.input_tokens += answer.usage.input_tokens
             self.output_tokens += answer.usage.output_tokens
         return answer
 
-    def last_usage(self) -> Usage:
-        """Usage of the last request made by the calling thread."""
+    def start_photo(self) -> None:
+        """Start counting the calling thread's usage for a new photo."""
+        self._local.usage = Usage()
+
+    def photo_usage(self) -> Usage:
+        """Usage of the calling thread's requests since :meth:`start_photo`."""
         usage: Usage = getattr(self._local, "usage", Usage())
         return usage
 
@@ -99,13 +108,18 @@ def run_dataset(
     images: Sequence[LabeledImage],
     *,
     profile: Profile,
-    provider: VisionProvider,
+    provider: VisionProvider | None = None,
+    local: LocalPipeline | None = None,
+    fallback: VisionProvider | None = None,
     cache: Path,
     force: bool = False,
     workers: int = 1,
     progress: Callable[[int, int, ImageOutcome], None] | None = None,
 ) -> RunResult:
     """Read every photo, reusing results already in ``cache`` unless ``force`` is set.
+
+    Give either an API ``provider``, or a ``local`` pipeline with an optional
+    ``fallback`` provider; the tokens of whichever API is called are counted.
 
     ``workers`` photos are read at the same time. Each result is saved to
     ``cache/<photo>.json`` as soon as it is read, so an interrupted run resumes where it
@@ -117,20 +131,30 @@ def run_dataset(
     usage: dict[str, list[int]] = (
         json.loads(usage_path.read_text(encoding="utf-8")) if usage_path.is_file() else {}
     )
-    counting = CountingProvider(provider)
-    reader = Reader(profile, backend=counting)
+    if (provider is None) == (local is None):
+        raise ValueError("give either a provider or a local pipeline")
+    api = provider if provider is not None else fallback
+    counting = CountingProvider(api) if api is not None else None
+    if local is not None:
+        reader = Reader(profile, backend=local, fallback=counting)
+    else:
+        assert counting is not None
+        reader = Reader(profile, backend=counting)
 
     def read_one(image: LabeledImage) -> tuple[ImageOutcome, Usage | None]:
         cached = cache / f"{image.path.stem}.json"
         if cached.is_file() and not force:
             return _outcome(image, json.loads(cached.read_text(encoding="utf-8"))), None
+        if counting is not None:
+            counting.start_photo()
         try:
             result = reader.read(image.path)
         except TagSortError as error:
             failed = ImageOutcome(image=image.path.name, session=image.session, error=str(error))
             return failed, None
         cached.write_text(result.to_json(indent=2), encoding="utf-8")
-        return _outcome(image, result.to_dict()), counting.last_usage()
+        spent = counting.photo_usage() if counting is not None else Usage()
+        return _outcome(image, result.to_dict()), spent
 
     outcomes: list[ImageOutcome] = []
     read_now = 0
