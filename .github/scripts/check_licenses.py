@@ -69,6 +69,7 @@ ALLOWED_LICENSE_NAMES = _ALLOWED_SPDX_LOWER | frozenset(
         "bsd",
         "bsd license",
         "new bsd license",
+        "3-clause bsd license",
         "simplified bsd license",
         "apache 2.0",
         "apache license 2.0",

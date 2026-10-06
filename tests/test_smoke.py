@@ -53,10 +53,11 @@ def test_public_api() -> None:
 
 
 def test_runtime_dependencies() -> None:
-    """The core needs Pillow only; everything else is an extra."""
+    """The core needs Pillow, numpy and ONNX Runtime only; everything else is an extra."""
     from importlib.metadata import requires
 
-    assert [r for r in requires("tagsort") or [] if "extra ==" not in r] == ["pillow>=11"]
+    names = sorted(r.split(">")[0] for r in requires("tagsort") or [] if "extra ==" not in r)
+    assert names == ["numpy", "onnxruntime", "pillow"]
 
 
 def test_core_does_not_import_httpx() -> None:
