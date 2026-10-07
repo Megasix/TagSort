@@ -195,6 +195,13 @@ def create_app(
             }
         )
 
+    async def ping(request: Request) -> JSONResponse:
+        # Health probe for load balancers (for example Runpod Serverless): 200 once the
+        # model is loaded, 503 when it is not, so traffic goes only to workers that can read.
+        if "pipeline" not in state:
+            raise _ApiError(503, "model_unavailable", state.get("model_error", "model not loaded"))
+        return JSONResponse({"status": "ok"})
+
     async def models(request: Request) -> JSONResponse:
         check_token(request)
         listed = []
@@ -273,6 +280,7 @@ def create_app(
     return Starlette(
         routes=[
             Route("/v1/health", health, methods=["GET"]),
+            Route("/ping", ping, methods=["GET"]),
             Route("/v1/models", models, methods=["GET"]),
             Route("/v1/read", read, methods=["POST"]),
         ],
