@@ -117,6 +117,21 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' -F image=@reference/images/upright.png localhost:8000/v1/read)" = 401
           docker rm -f server
 
+  docker-gpu:
+    name: GPU Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the image
+        run: docker build -f docker/Dockerfile.gpu -t tagsort-gpu .
+      # CI has no GPU: the image must find the GPU build and fall back to the CPU.
+      - name: Read on the CPU fallback
+        run: |
+          docker run --rm --entrypoint python tagsort-gpu -c "import onnxruntime as o; p = o.get_available_providers(); print(p); assert 'CUDAExecutionProvider' in p"
+          python3 -c "import json; json.dump(json.load(open('reference/pipeline.v1.json'))['profile'], open('reference/profile.json', 'w'))"
+          docker run --rm -v "$PWD/reference:/data:ro" tagsort-gpu read /data/images/upright.png --profile /data/profile.json --model ppocrv6-tiny | tee out.jsonl
+          python3 -c "import json; tags = json.loads(open('out.jsonl').readline())['result']['tags']; assert [t['text'] for t in tags] == ['GJ07966'], tags"
+
   license:
     name: License check
     runs-on: ubuntu-latest

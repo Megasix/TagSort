@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from tagsort.models import RecognitionParams
+from tagsort.pipeline.runtime import Device, create_session
 
 __all__ = ["OnnxRecognizer", "Recognizer"]
 
@@ -38,15 +39,20 @@ class OnnxRecognizer:
     Safe to share between threads.
     """
 
-    def __init__(self, path: str | Path, params: RecognitionParams) -> None:
-        """Load the model at ``path`` with the preprocessing described by ``params``."""
-        import onnxruntime
+    def __init__(
+        self,
+        path: str | Path,
+        params: RecognitionParams,
+        *,
+        device: Device = "cpu",
+        threads: int | None = None,
+    ) -> None:
+        """Load the model at ``path`` with the preprocessing described by ``params``.
 
-        options = onnxruntime.SessionOptions()
-        options.log_severity_level = 3
-        self._session = onnxruntime.InferenceSession(
-            str(path), sess_options=options, providers=["CPUExecutionProvider"]
-        )
+        ``device`` and ``threads`` choose where and on how many CPU threads it runs, see
+        :func:`tagsort.pipeline.runtime.create_session`.
+        """
+        self._session = create_session(path, device=device, threads=threads)
         self._input = self._session.get_inputs()[0].name
         self._params = params
         self._classes = params.classes

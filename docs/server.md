@@ -39,7 +39,9 @@ Errors have a stable shape, `{"error": {"code": "...", "message": "..."}}`, with
 | `GEMINI_API_KEY`, ... | | Key of the fallback provider |
 | `TAGSORT_PROFILES` | unset | Folder of profiles (`*.json`), usable as `profile_name` |
 | `TAGSORT_MAX_UPLOAD_MB` | 25 | Largest accepted photo |
-| `TAGSORT_CONCURRENCY` | number of CPUs | Photos read at the same time |
+| `TAGSORT_CONCURRENCY` | usable CPUs | Photos read at the same time |
+| `TAGSORT_DEVICE` | `cpu` (`auto` in the GPU image) | `cpu`, `cuda` (fail without a GPU) or `auto` (GPU when usable, else CPU) |
+| `TAGSORT_THREADS` | usable CPUs | CPU threads for one photo |
 | `PORT` | 8000 | Listening port (set by most hosts) |
 
 ## Running
@@ -65,8 +67,9 @@ TAGSORT_API_TOKEN=change-me tagsort serve --host 0.0.0.0
 
 ## Resources
 
-Reading needs a CPU only; GPUs are only for training. Measured on a laptop (Apple
-silicon), one photo at a time; expect cloud CPUs to be two to three times slower.
+Reading needs a CPU only; a GPU makes it faster (see [On a GPU](#on-a-gpu)). Measured on a
+laptop (Apple silicon), one photo at a time; expect cloud CPUs to be two to three times
+slower.
 
 | Model | Peak memory | Time per photo |
 | --- | --- | --- |
@@ -76,6 +79,32 @@ silicon), one photo at a time; expect cloud CPUs to be two to three times slower
 
 Plan about 1 GB per photo read at the same time on top of the base, and set
 `TAGSORT_CONCURRENCY` to fit the instance's memory.
+
+"Usable CPUs" means the CPUs the process may really use: in a container, its CPU quota
+rather than the host's cores, which the container may also see. Reading with more threads
+than that only slows down.
+
+## On a GPU
+
+`docker/Dockerfile.gpu` builds the same server with the GPU build of ONNX Runtime
+(`onnxruntime-gpu`, MIT) and CUDA 13 and cuDNN 9 from NVIDIA's pip wheels:
+
+```sh
+docker build -f docker/Dockerfile.gpu -t tagsort:gpu .
+docker run --gpus all -p 8000:8000 -e TAGSORT_API_TOKEN=change-me tagsort:gpu
+```
+
+The host needs an NVIDIA driver for CUDA 13 (R580 or later). Without a usable GPU the server
+logs `no usable GPU; reading on the CPU` and keeps working; set `TAGSORT_DEVICE=cuda` to
+fail instead. The CUDA and cuDNN libraries in this image are NVIDIA's, under NVIDIA's
+licenses; check them before redistributing the image.
+
+In Python, `LocalPipeline(device="cuda")` or `device="auto"` does the same once
+`onnxruntime-gpu` replaces `onnxruntime`:
+
+```sh
+pip uninstall onnxruntime && pip install "onnxruntime-gpu[cuda,cudnn]"
+```
 
 ## Deploying on Render
 
@@ -96,6 +125,6 @@ their own server, never from the browser with the token.
 ## Published image
 
 Each release publishes `ghcr.io/megasix/tagsort:<version>` and `:latest` to the GitHub
-Container Registry. On Render, choose **New > Web Service > Existing image** and enter
+Container Registry, and the GPU image as `:<version>-gpu` and `:gpu`. On Render, choose **New > Web Service > Existing image** and enter
 `ghcr.io/megasix/tagsort:0.1.0` instead of building from the repository; pin a version
 rather than `latest` so deployments stay reproducible.

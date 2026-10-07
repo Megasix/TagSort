@@ -12,6 +12,7 @@ from tagsort.grammar.decode import constrained, greedy
 from tagsort.models import DEFAULT_MODEL, load_manifest, model_files
 from tagsort.pipeline.detect import DetectedLine, Detector, OnnxDetector
 from tagsort.pipeline.recognize import OnnxRecognizer, Recognizer
+from tagsort.pipeline.runtime import Device
 from tagsort.profile import Profile
 
 __all__ = ["LineReading", "LocalPipeline", "score"]
@@ -71,9 +72,16 @@ class LocalPipeline:
         model: Name of a downloaded model, see :func:`tagsort.available_models`.
         directory: Where models are stored; defaults to :func:`tagsort.models.models_dir`.
         detection_side: Longest image side for detection, in pixels.
+        device: Where the models run: ``"cpu"`` (default), ``"cuda"`` for an NVIDIA GPU
+            (needs ``onnxruntime-gpu``, see ``docker/Dockerfile.gpu``), or ``"auto"`` for
+            the GPU when one is usable and the CPU otherwise.
+        threads: CPU threads per inference. Defaults to the CPUs the process may really
+            use, which in a container is its CPU quota rather than the host's cores.
 
     Raises:
-        ModelError: If the model is unknown or not downloaded.
+        ModelError: If the model is unknown or not downloaded, or ``device="cuda"`` and
+            no GPU can be used.
+        ValueError: If ``device`` is unknown or ``threads`` is below 1.
     """
 
     def __init__(
@@ -82,6 +90,8 @@ class LocalPipeline:
         *,
         directory: str | Path | None = None,
         detection_side: int = DETECTION_SIDE,
+        device: Device = "cpu",
+        threads: int | None = None,
     ) -> None:
         """Load the model."""
         manifest = load_manifest(model)
@@ -89,9 +99,15 @@ class LocalPipeline:
         self.model = model
         self.version = manifest.version
         self._detector: Detector = OnnxDetector(
-            files["det"], manifest.detection, limit_side=detection_side
+            files["det"],
+            manifest.detection,
+            limit_side=detection_side,
+            device=device,
+            threads=threads,
         )
-        self._recognizer: Recognizer = OnnxRecognizer(files["rec"], manifest.recognition)
+        self._recognizer: Recognizer = OnnxRecognizer(
+            files["rec"], manifest.recognition, device=device, threads=threads
+        )
 
     def read(self, image: Image.Image, profile: Profile) -> list[LineReading]:
         """Return the lines of an upright image that read as a tag of ``profile``."""

@@ -19,6 +19,7 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from tagsort.models import DetectionParams
+from tagsort.pipeline.runtime import Device, create_session
 
 __all__ = ["DetectedLine", "Detector", "OnnxDetector", "boxes_from_map", "min_area_rect"]
 
@@ -56,7 +57,13 @@ class OnnxDetector:
     """
 
     def __init__(
-        self, path: str | Path, params: DetectionParams, *, limit_side: int | None = None
+        self,
+        path: str | Path,
+        params: DetectionParams,
+        *,
+        limit_side: int | None = None,
+        device: Device = "cpu",
+        threads: int | None = None,
     ) -> None:
         """Load the model.
 
@@ -65,14 +72,10 @@ class OnnxDetector:
             params: Preprocessing and postprocessing from the model manifest.
             limit_side: Longest side the image is resized to before detection;
                 defaults to the manifest's. Larger finds smaller text but is slower.
+            device: Where the model runs, see :data:`tagsort.pipeline.runtime.Device`.
+            threads: CPU threads per inference; defaults to the CPUs really usable.
         """
-        import onnxruntime
-
-        options = onnxruntime.SessionOptions()
-        options.log_severity_level = 3
-        self._session = onnxruntime.InferenceSession(
-            str(path), sess_options=options, providers=["CPUExecutionProvider"]
-        )
+        self._session = create_session(path, device=device, threads=threads)
         self._input = self._session.get_inputs()[0].name
         self._params = params
         self._limit = limit_side or params.limit_side

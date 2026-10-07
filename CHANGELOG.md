@@ -5,6 +5,21 @@ All notable changes to TagSort. The format follows
 [Semantic Versioning](https://semver.org/). Contracts (`schemas/`) are versioned
 separately: a breaking change creates a new major version of the schema.
 
+## Unreleased
+
+### Added
+
+- `LocalPipeline(device=..., threads=...)`: read on an NVIDIA GPU with `device="cuda"`, or
+  `device="auto"` to use one when available; `threads` sets the CPU threads per photo.
+- Server settings `TAGSORT_DEVICE` and `TAGSORT_THREADS`.
+- `docker/Dockerfile.gpu`: the server on a GPU (`onnxruntime-gpu`, CUDA 13), published as
+  `ghcr.io/megasix/tagsort:<version>-gpu`.
+
+### Changed
+
+- ONNX Runtime threads and the server's default concurrency now follow the CPUs the
+  process may really use (affinity and container CPU quota) instead of the host's cores.
+
 ## [0.1.0] - 2026-10-06
 
 First public release.
