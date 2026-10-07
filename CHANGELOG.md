@@ -19,6 +19,9 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Changed
 
+- On a GPU, ONNX Runtime's CUDA provider picks cuDNN convolution algorithms heuristically
+  instead of benchmarking them again for every new text-line width.
+
 - ONNX Runtime threads and the server's default concurrency now follow the CPUs the
   process may really use (affinity and container CPU quota) instead of the host's cores.
 
