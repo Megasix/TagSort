@@ -23,6 +23,8 @@ __all__ = ["Profile", "TagSpec"]
 _TAG_ID = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}")
 _PROFILE_KEYS = ("schema_version", "name", "tags_per_individual", "tags")
 _TAG_KEYS = ("id", "pattern")
+_TAG_OPTIONAL_KEYS = ("header",)
+_MAX_HEADER = 200
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,9 @@ class TagSpec:
             a letter, then up to 63 letters, digits, ``_`` or ``-``.
         pattern: Every text this kind of tag may carry, in the regex subset described in
             ``docs/patterns.md``. Always matched against the whole text.
+        header: Optional text printed on this kind of tag, such as ``NATIONAL MUSEUM OF
+            CANADA``. When several kinds accept the same reading, the one whose header is
+            seen in the photo wins (see ``docs/headers.md``).
 
     Raises:
         PatternError: If ``pattern`` is outside the supported subset.
@@ -42,6 +47,7 @@ class TagSpec:
 
     id: str
     pattern: str
+    header: str | None = None
     _automaton: Automaton = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -53,6 +59,14 @@ class TagSpec:
             )
         if not isinstance(self.pattern, str):
             raise ProfileError(f"pattern must be a string, not {type(self.pattern).__name__}")
+        if self.header is not None and (
+            not isinstance(self.header, str)
+            or not self.header.strip()
+            or len(self.header) > _MAX_HEADER
+        ):
+            raise ProfileError(
+                f"header must be a non-empty string of at most {_MAX_HEADER} characters"
+            )
         object.__setattr__(self, "_automaton", compile_pattern(self.pattern))
 
     def matches(self, text: str) -> bool:
@@ -61,7 +75,10 @@ class TagSpec:
 
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-ready form of this tag, as it appears in a profile."""
-        return {"id": self.id, "pattern": self.pattern}
+        data: dict[str, Any] = {"id": self.id, "pattern": self.pattern}
+        if self.header is not None:
+            data["header"] = self.header
+        return data
 
 
 @dataclass(frozen=True)
@@ -238,15 +255,21 @@ def _json_type(value: object) -> str:
     return type(value).__name__
 
 
-def _check_keys(data: Mapping[str, Any], allowed: Iterable[str], location: str | None) -> None:
-    allowed = tuple(allowed)
+def _check_keys(
+    data: Mapping[str, Any],
+    required: Iterable[str],
+    location: str | None,
+    optional: Iterable[str] = (),
+) -> None:
+    required = tuple(required)
+    allowed = (*required, *optional)
     prefix = f"{location}." if location else ""
     for key in data:
         if key not in allowed:
             raise ProfileError(
                 f"unknown property {key!r}; expected only {', '.join(allowed)}", location=location
             )
-    for key in allowed:
+    for key in required:
         if key not in data:
             raise ProfileError("required property is missing", location=f"{prefix}{key}")
 
@@ -255,14 +278,20 @@ def _tag_from_dict(data: object, index: int) -> TagSpec:
     location = f"tags[{index}]"
     if not isinstance(data, Mapping):
         raise ProfileError(f"must be an object, not {_json_type(data)}", location=location)
-    _check_keys(data, _TAG_KEYS, location=location)
-    for key in _TAG_KEYS:
-        if not isinstance(data[key], str):
+    _check_keys(data, _TAG_KEYS, location=location, optional=_TAG_OPTIONAL_KEYS)
+    for key in (*_TAG_KEYS, *_TAG_OPTIONAL_KEYS):
+        if key in data and not isinstance(data[key], str):
             raise ProfileError(
                 f"must be a string, not {_json_type(data[key])}", location=f"{location}.{key}"
             )
+    header = data.get("header")
+    if header is not None and (not header.strip() or len(header) > _MAX_HEADER):
+        raise ProfileError(
+            f"must be a non-empty string of at most {_MAX_HEADER} characters",
+            location=f"{location}.header",
+        )
     try:
-        return TagSpec(id=data["id"], pattern=data["pattern"])
+        return TagSpec(id=data["id"], pattern=data["pattern"], header=header)
     except PatternError as error:
         raise error.at(f"{location}.pattern") from None
     except ProfileError as error:

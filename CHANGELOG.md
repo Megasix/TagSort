@@ -9,6 +9,11 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Added
 
+- Printed headers: a kind of tag in a profile may have a `header`, text printed on that
+  kind of tag (`NATIONAL MUSEUM OF CANADA`). When a reading fits several kinds, the kind
+  whose header is seen in the photo is reported (`docs/headers.md`). Optional in
+  `profile.v1.json`; profiles without it are unchanged.
+
 - `LocalPipeline(device=..., threads=...)`: read on an NVIDIA GPU with `device="cuda"`, or
   `device="auto"` to use one when available; `threads` sets the CPU threads per photo.
 - Server settings `TAGSORT_DEVICE` and `TAGSORT_THREADS`.
