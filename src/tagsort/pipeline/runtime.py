@@ -13,7 +13,7 @@ from tagsort.models import ModelError
 if TYPE_CHECKING:
     import onnxruntime
 
-__all__ = ["DEVICES", "Device", "create_session", "providers_for", "usable_cpus"]
+__all__ = ["CUDA_OPTIONS", "DEVICES", "Device", "create_session", "providers_for", "usable_cpus"]
 
 logger = logging.getLogger("tagsort")
 
@@ -25,6 +25,16 @@ DEVICES: tuple[Device, ...] = get_args(Device)
 
 _CPU = "CPUExecutionProvider"
 _CUDA = "CUDAExecutionProvider"
+
+CUDA_OPTIONS: dict[str, str] = {
+    # Text lines have a different width each time. The default, EXHAUSTIVE, benchmarks
+    # every cuDNN convolution algorithm again for each new input shape, which costs more
+    # than the inference itself; HEURISTIC picks one directly.
+    "cudnn_conv_algo_search": "HEURISTIC",
+    # Grow GPU memory to what is asked rather than doubling the arena each time.
+    "arena_extend_strategy": "kSameAsRequested",
+}
+"""Options of ONNX Runtime's CUDA provider used by :func:`create_session`."""
 _CGROUP = Path("/sys/fs/cgroup")
 
 
@@ -127,7 +137,10 @@ def create_session(
     options.inter_op_num_threads = 1
     if providers[0] == _CUDA:
         _preload_cuda()
-    session = onnxruntime.InferenceSession(str(path), sess_options=options, providers=providers)
+    configured: list[str | tuple[str, dict[str, str]]] = [
+        (name, CUDA_OPTIONS) if name == _CUDA else name for name in providers
+    ]
+    session = onnxruntime.InferenceSession(str(path), sess_options=options, providers=configured)
     if providers[0] == _CUDA and session.get_providers()[0] != _CUDA:
         if device == "cuda":
             raise ModelError("the CUDA provider is installed but could not use a GPU")

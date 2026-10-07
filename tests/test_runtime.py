@@ -73,11 +73,12 @@ def test_without_affinity_the_cpu_count_is_used(
 
 
 class FakeSession:
-    def __init__(self, path: str, sess_options: Any, providers: list[str]) -> None:
+    def __init__(self, path: str, sess_options: Any, providers: list[Any]) -> None:
         self.path = path
         self.options = sess_options
-        self.asked = providers
-        self.used = providers if FakeSession.gpu_works else [CPU]
+        self.configured = providers
+        self.asked = [p[0] if isinstance(p, tuple) else p for p in providers]
+        self.used = self.asked if FakeSession.gpu_works else [CPU]
 
     gpu_works = True
 
@@ -108,6 +109,9 @@ def test_session_threads_default_to_the_usable_cpus(fake_ort: Any) -> None:
 def test_session_on_the_gpu(fake_ort: Any) -> None:
     session: Any = create_session("model.onnx", device="cuda")
     assert session.asked == [CUDA, CPU]
+    # Variable-width text lines: no exhaustive cuDNN benchmark per new shape.
+    assert session.configured[0] == (CUDA, runtime.CUDA_OPTIONS)
+    assert runtime.CUDA_OPTIONS["cudnn_conv_algo_search"] == "HEURISTIC"
 
 
 def test_cuda_that_cannot_use_a_gpu_fails_and_auto_warns(
