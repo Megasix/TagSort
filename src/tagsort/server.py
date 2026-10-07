@@ -46,6 +46,7 @@ from tagsort.fallback.base import VisionProvider
 from tagsort.models import ModelError, available_models, load_manifest, model_files
 from tagsort.pipeline.local import LocalPipeline
 from tagsort.pipeline.reader import Reader
+from tagsort.pipeline.runtime import DEVICES, Device, usable_cpus
 from tagsort.profile import Profile
 
 __all__ = ["ServerConfig", "create_app"]
@@ -73,7 +74,9 @@ class ServerConfig:
     fallback: str | None = None
     profiles: dict[str, Profile] = field(default_factory=dict)
     max_upload_bytes: int = 25 * 1024 * 1024
-    concurrency: int = max(os.cpu_count() or 1, 1)
+    concurrency: int = field(default_factory=usable_cpus)
+    device: Device = "cpu"
+    threads: int | None = None
 
     @classmethod
     def from_env(cls, environ: dict[str, str] | None = None) -> ServerConfig:
@@ -81,7 +84,9 @@ class ServerConfig:
 
         Raises:
             TagSortError: If no token is set and ``TAGSORT_ALLOW_NO_TOKEN`` is not ``1``,
-                or a profile in ``TAGSORT_PROFILES`` is invalid.
+                a profile in ``TAGSORT_PROFILES`` is invalid, ``TAGSORT_DEVICE`` is not
+                ``cpu``, ``cuda`` or ``auto``, or ``TAGSORT_THREADS`` is not a positive
+                integer.
         """
         env = dict(os.environ if environ is None else environ)
         token = env.get("TAGSORT_API_TOKEN") or None
@@ -94,13 +99,21 @@ class ServerConfig:
         if folder:
             for path in sorted(Path(folder).glob("*.json")):
                 profiles[path.stem] = Profile.from_file(path)
+        device = env.get("TAGSORT_DEVICE") or "cpu"
+        if device not in DEVICES:
+            raise TagSortError(f"TAGSORT_DEVICE must be one of {', '.join(DEVICES)}")
+        threads_text = env.get("TAGSORT_THREADS") or ""
+        if threads_text and (not threads_text.isdigit() or int(threads_text) < 1):
+            raise TagSortError("TAGSORT_THREADS must be a positive integer")
         return cls(
             token=token,
             model=env.get("TAGSORT_MODEL") or SERVER_MODEL,
             fallback=env.get("TAGSORT_FALLBACK") or None,
             profiles=profiles,
             max_upload_bytes=int(float(env.get("TAGSORT_MAX_UPLOAD_MB", "25")) * 1024 * 1024),
-            concurrency=max(int(env.get("TAGSORT_CONCURRENCY", "0")) or (os.cpu_count() or 1), 1),
+            concurrency=max(int(env.get("TAGSORT_CONCURRENCY", "0")) or usable_cpus(), 1),
+            device=device,
+            threads=int(threads_text) if threads_text else None,
         )
 
 
@@ -114,14 +127,15 @@ class _ApiError(Exception):
 def create_app(
     config: ServerConfig,
     *,
-    pipeline_factory: Callable[[str], LocalPipeline] = LocalPipeline,
+    pipeline_factory: Callable[..., LocalPipeline] = LocalPipeline,
     fallback_factory: Callable[[str], VisionProvider] | None = None,
 ) -> Starlette:
     """Build the HTTP application.
 
     Args:
         config: How the server reads.
-        pipeline_factory: Builds the local pipeline from a model name; for tests.
+        pipeline_factory: Builds the local pipeline from a model name, with ``device``
+            and ``threads`` keywords; for tests.
         fallback_factory: Builds the fallback provider from ``config.fallback``; defaults
             to the providers of the ``api`` extra with keys from the environment.
 
@@ -134,7 +148,9 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncIterator[None]:
         try:
-            state["pipeline"] = pipeline_factory(config.model)
+            state["pipeline"] = pipeline_factory(
+                config.model, device=config.device, threads=config.threads
+            )
         except ModelError as error:
             logger.error("model unavailable: %s", error)
             state["model_error"] = str(error)

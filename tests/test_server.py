@@ -53,9 +53,13 @@ def component(name: str) -> dict[str, Any]:
 
 
 class StubPipeline(LocalPipeline):
-    def __init__(self, model: str = "stub") -> None:
+    def __init__(
+        self, model: str = "stub", *, device: str = "cpu", threads: int | None = None
+    ) -> None:
         self.model = model
         self.version = "1.0"
+        self.device = device
+        self.threads = threads
 
     def read(self, image: Image.Image, profile: Profile) -> list[LineReading]:
         return [
@@ -240,7 +244,7 @@ def test_large_uploads_are_refused() -> None:
 
 
 def test_missing_model_answers_503() -> None:
-    def broken(model: str) -> LocalPipeline:
+    def broken(model: str, **options: Any) -> LocalPipeline:
         raise ModelError("model 'x' is not downloaded")
 
     with client(pipeline=broken) as c:
@@ -313,3 +317,29 @@ def test_default_fallback_needs_its_key(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     provider = _default_fallback("gemini:gemini-3.5-flash-lite")
     assert provider.model == "gemini-3.5-flash-lite"
+
+
+def test_device_and_threads_come_from_the_environment() -> None:
+    config = ServerConfig.from_env(
+        {"TAGSORT_API_TOKEN": TOKEN, "TAGSORT_DEVICE": "auto", "TAGSORT_THREADS": "3"}
+    )
+    assert (config.device, config.threads) == ("auto", 3)
+    assert ServerConfig.from_env({"TAGSORT_API_TOKEN": TOKEN}).device == "cpu"
+    with pytest.raises(TagSortError, match="TAGSORT_DEVICE"):
+        ServerConfig.from_env({"TAGSORT_API_TOKEN": TOKEN, "TAGSORT_DEVICE": "tpu"})
+    for bad in ("0", "-1", "two"):
+        with pytest.raises(TagSortError, match="TAGSORT_THREADS"):
+            ServerConfig.from_env({"TAGSORT_API_TOKEN": TOKEN, "TAGSORT_THREADS": bad})
+
+
+def test_the_pipeline_gets_the_device_and_threads() -> None:
+    built: list[StubPipeline] = []
+
+    def factory(model: str, **options: Any) -> StubPipeline:
+        built.append(StubPipeline(model, **options))
+        return built[-1]
+
+    config = ServerConfig(token=TOKEN, device="cuda", threads=2)
+    with client(config, pipeline=factory) as c:
+        assert c.get("/v1/health").status_code == 200
+    assert (built[0].device, built[0].threads) == ("cuda", 2)

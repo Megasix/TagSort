@@ -63,3 +63,6 @@ jobs:
           docker build -f docker/Dockerfile -t "$IMAGE:$version" -t "$IMAGE:latest" .
           docker push "$IMAGE:$version"
           docker push "$IMAGE:latest"
+          docker build -f docker/Dockerfile.gpu -t "$IMAGE:$version-gpu" -t "$IMAGE:gpu" .
+          docker push "$IMAGE:$version-gpu"
+          docker push "$IMAGE:gpu"
