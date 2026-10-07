@@ -182,7 +182,9 @@ def test_pattern_error_is_located() -> None:
 def test_error_message_names_the_location() -> None:
     with pytest.raises(ProfileError) as info:
         Profile.from_dict(with_change(("tags", 0, "colour"), "red"))
-    assert str(info.value) == "tags[0]: unknown property 'colour'; expected only id, pattern"
+    assert (
+        str(info.value) == "tags[0]: unknown property 'colour'; expected only id, pattern, header"
+    )
 
 
 def test_match_and_tag_lookup() -> None:

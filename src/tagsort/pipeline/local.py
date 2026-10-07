@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PIL import Image
@@ -11,6 +11,7 @@ from PIL import Image
 from tagsort.grammar.decode import constrained, greedy
 from tagsort.models import DEFAULT_MODEL, load_manifest, model_files
 from tagsort.pipeline.detect import DetectedLine, Detector, OnnxDetector
+from tagsort.pipeline.headers import choose_kind, headers_seen
 from tagsort.pipeline.recognize import OnnxRecognizer, Recognizer
 from tagsort.pipeline.runtime import Device
 from tagsort.profile import Profile
@@ -111,15 +112,18 @@ class LocalPipeline:
 
     def read(self, image: Image.Image, profile: Profile) -> list[LineReading]:
         """Return the lines of an upright image that read as a tag of ``profile``."""
-        return [
-            reading
-            for line in self._detector.detect(image)
-            if (reading := self._read_line(image, line, profile)) is not None
-        ]
+        results = [self._read_line(image, line, profile) for line in self._detector.detect(image)]
+        readings = [reading for reading, _ in results if reading is not None]
+        if not any(tag.header for tag in profile.tags):
+            return readings
+        # Printed headers choose between kinds that accept the same reading.
+        seen = headers_seen(profile, (text for _, text in results))
+        return [_with_kinds(reading, profile, seen) for reading in readings]
 
     def _read_line(
         self, image: Image.Image, line: DetectedLine, profile: Profile
-    ) -> LineReading | None:
+    ) -> tuple[LineReading | None, str]:
+        """Read one line: as a tag when it reads as one, and as plain text in any case."""
         tl, tr, br, bl = line.quad
         width = max(2, round(math.dist(tl, tr)))
         height = max(2, round(math.dist(tl, bl)))
@@ -134,10 +138,14 @@ class LocalPipeline:
         turns = (0, 180, 90, 270) if height > width * 1.2 else (0, 180)
         best: dict[str, tuple[float, str, int]] = {}
         agreeing: dict[int, str] = {}
+        plain = ("", 0.0)
         for turn in turns:
             upright = crop.rotate(turn, expand=True)
             probs = self._recognizer.probabilities(upright)
-            agreeing[turn] = greedy(probs, self._recognizer.classes).text.replace(" ", "")
+            unconstrained = greedy(probs, self._recognizer.classes)
+            agreeing[turn] = unconstrained.text.replace(" ", "")
+            if unconstrained.probability > plain[1]:
+                plain = (unconstrained.text, unconstrained.probability)
             for spec in profile.tags:
                 for reading in constrained(probs, self._recognizer.classes, spec._automaton)[
                     :CANDIDATES_PER_LINE
@@ -146,12 +154,12 @@ class LocalPipeline:
                         best[reading.text] = (reading.probability, spec.id, turn)
         ranked = sorted(best.items(), key=lambda item: item[1][0], reverse=True)
         if not ranked or ranked[0][1][0] < MIN_LINE_PROBABILITY:
-            return None
+            return None, plain[0]
         text, (_, _, turn) = ranked[0]
         base = math.degrees(math.atan2(tr[1] - tl[1], tr[0] - tl[0]))
         corners = [tl, tr, br, bl]
         shift = turn // 90
-        return LineReading(
+        tag_line = LineReading(
             quad=tuple(corners[shift:] + corners[:shift]),
             angle=(base + turn) % 360,
             readings=tuple(
@@ -161,3 +169,15 @@ class LocalPipeline:
             agrees=agreeing[turn] == text,
             crop=crop.rotate(turn, expand=True),
         )
+        return tag_line, plain[0]
+
+
+def _with_kinds(reading: LineReading, profile: Profile, seen: frozenset[str]) -> LineReading:
+    """The reading with each text reported as the kind its printed header points to."""
+    return replace(
+        reading,
+        readings=tuple(
+            (text, probability, choose_kind(profile, text, tag_id, seen))
+            for text, probability, tag_id in reading.readings
+        ),
+    )

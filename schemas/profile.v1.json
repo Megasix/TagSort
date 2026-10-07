@@ -43,6 +43,12 @@
           "description": "Every text this kind of tag may carry, in the regex subset of docs/patterns.md. Always matched against the whole text.",
           "type": "string",
           "minLength": 1
+        },
+        "header": {
+          "description": "Optional text printed on this kind of tag, such as NATIONAL MUSEUM OF CANADA. When several kinds accept the same reading, the kind whose header is seen in the photo is reported (docs/headers.md). Optional, so profiles without it are unchanged.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
         }
       }
     }
