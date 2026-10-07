@@ -1,0 +1,37 @@
+# Publishes the GPU image from any commit, without a release, to test it on a GPU host:
+# Actions > Publish a GPU image > Run workflow. Releases publish :<version>-gpu themselves.
+name: Publish a GPU image
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Extra tag to push besides gpu-<commit>
+        default: gpu-edge
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and push the GPU image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/megasix/tagsort
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build and push
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          case "$TAG" in gpu-*) ;; *) echo "the tag must start with gpu-" >&2; exit 1 ;; esac
+          short="$(git rev-parse --short=12 HEAD)"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build -f docker/Dockerfile.gpu -t "$IMAGE:gpu-$short" -t "$IMAGE:$TAG" .
+          docker push "$IMAGE:gpu-$short"
+          docker push "$IMAGE:$TAG"
+          echo "Pushed $IMAGE:gpu-$short and $IMAGE:$TAG" >> "$GITHUB_STEP_SUMMARY"

@@ -12,6 +12,8 @@ separately: a breaking change creates a new major version of the schema.
 - `LocalPipeline(device=..., threads=...)`: read on an NVIDIA GPU with `device="cuda"`, or
   `device="auto"` to use one when available; `threads` sets the CPU threads per photo.
 - Server settings `TAGSORT_DEVICE` and `TAGSORT_THREADS`.
+- `GET /ping`, a load-balancer probe (200 once the model is loaded, 503 otherwise), and a
+  guide to deploying the GPU image on Runpod Serverless.
 - `docker/Dockerfile.gpu`: the server on a GPU (`onnxruntime-gpu`, CUDA 13), published as
   `ghcr.io/megasix/tagsort:<version>-gpu`.
 

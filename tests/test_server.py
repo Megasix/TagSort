@@ -255,7 +255,9 @@ def test_missing_model_answers_503() -> None:
             data={"profile_name": "lot"},
         )
         assert c.get("/v1/health").status_code == 200
+        ping = c.get("/ping")
     assert (response.status_code, response.json()["error"]["code"]) == (503, "model_unavailable")
+    assert (ping.status_code, ping.json()["error"]["code"]) == (503, "model_unavailable")
 
 
 def test_unexpected_errors_are_hidden() -> None:
@@ -343,3 +345,9 @@ def test_the_pipeline_gets_the_device_and_threads() -> None:
     with client(config, pipeline=factory) as c:
         assert c.get("/v1/health").status_code == 200
     assert (built[0].device, built[0].threads) == ("cuda", 2)
+
+
+def test_ping_answers_once_the_model_is_loaded() -> None:
+    with client() as c:
+        response = c.get("/ping")
+    assert (response.status_code, response.json()) == (200, {"status": "ok"})

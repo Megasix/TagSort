@@ -13,6 +13,7 @@ photos, texts or tokens.
 | Method and path | Auth | Purpose |
 | --- | --- | --- |
 | `GET /v1/health` | none | Status, engine version, model, fallback |
+| `GET /ping` | none | Load-balancer probe: 200 once the model is loaded, 503 otherwise |
 | `GET /v1/models` | bearer | Models the server knows and whether they are downloaded |
 | `POST /v1/read` | bearer | Read one photo (`multipart/form-data`: `image`, and `profile` or `profile_name`) |
 
@@ -33,7 +34,7 @@ Errors have a stable shape, `{"error": {"code": "...", "message": "..."}}`, with
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `TAGSORT_API_TOKEN` | required | Bearer token clients send. Use a long random value. |
-| `TAGSORT_ALLOW_NO_TOKEN` | unset | `1` disables the token, for local development only |
+| `TAGSORT_ALLOW_NO_TOKEN` | unset | `1` disables the token: for local development, or behind a host that authenticates requests itself (see Runpod below) |
 | `TAGSORT_MODEL` | `ppocrv6-small` | Local model (the Docker image holds `ppocrv6-tiny` and `ppocrv6-small`) |
 | `TAGSORT_FALLBACK` | off | Vision API for doubtful tags, `provider[:model]`, for example `gemini`; only tag crops are sent |
 | `GEMINI_API_KEY`, ... | | Key of the fallback provider |
@@ -121,6 +122,29 @@ pip uninstall onnxruntime && pip install "onnxruntime-gpu[cuda,cudnn]"
 Render serves HTTPS and sets `PORT`. Keep the token secret: anyone holding it can send
 photos to the service. Applications such as a web front end should call TagSort from
 their own server, never from the browser with the token.
+
+## Deploying on Runpod Serverless (GPU)
+
+Runpod's **load-balancing** endpoints send HTTP requests straight to the server, which fits
+TagSort as it is: no handler, no queue. Runpod probes `GET /ping`, which answers 200 once
+the model is loaded.
+
+1. Create a Serverless endpoint of type **Load balancer** with the image
+   `ghcr.io/megasix/tagsort:<version>-gpu` (public, no registry login needed).
+2. GPU: any NVIDIA card with 16 GB or more and a driver for CUDA 13 (filter on CUDA 13.0 or
+   later). The models are small; the cheapest GPU of a data center close to the callers is
+   usually enough.
+3. Port `8000/http`, and environment `PORT=8000`, `PORT_HEALTH=8000`.
+4. Authentication: Runpod checks `Authorization: Bearer <Runpod API key>` before a request
+   reaches TagSort, and the same header cannot carry a second token. Set
+   `TAGSORT_ALLOW_NO_TOKEN=1` so TagSort relies on Runpod's check, and give callers a Runpod
+   API key restricted to this endpoint.
+5. Scaling: minimum 0 workers for pay-per-use (the first request after an idle period waits
+   for a cold start), and a request-count scaler.
+
+Callers then send `POST https://<endpoint-id>.api.runpod.ai/v1/read` with the Runpod key.
+Load-balancing endpoints drop requests when every worker is busy instead of queuing them:
+callers should retry on 5xx and network errors.
 
 ## Published image
 

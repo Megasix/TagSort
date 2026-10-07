@@ -22,6 +22,30 @@
         }
       }
     },
+    "/ping": {
+      "get": {
+        "operationId": "ping",
+        "summary": "Health probe for load balancers: ready to read or not",
+        "description": "Answers 200 once the model is loaded and 503 when it is not, so a load balancer (for example Runpod Serverless) only sends photos to instances that can read them. Unversioned because load balancers probe this fixed path.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The model is loaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "additionalProperties": false,
+                  "properties": { "status": { "const": "ok" } }
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/v1/models": {
       "get": {
         "operationId": "models",
