@@ -28,6 +28,7 @@ def test_public_api() -> None:
         "LocalPipeline",
         "ModelError",
         "OpenAIProvider",
+        "OtherText",
         "PatternError",
         "Point",
         "Profile",

@@ -84,6 +84,11 @@
                   "profile_name": {
                     "description": "Name of a profile loaded by the server at startup.",
                     "type": "string"
+                  },
+                  "open_reading": {
+                    "description": "\"1\" or \"true\": also return other_texts, the lines that fit no kind of tag, with how likely each is a specimen tag (docs/open-reading.md).",
+                    "type": "string",
+                    "enum": ["0", "1", "false", "true"]
                   }
                 }
               }

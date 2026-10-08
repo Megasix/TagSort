@@ -15,7 +15,7 @@ photos, texts or tokens.
 | `GET /v1/health` | none | Status, engine version, model, fallback |
 | `GET /ping` | none | Load-balancer probe: 200 once the model is loaded, 503 otherwise |
 | `GET /v1/models` | bearer | Models the server knows and whether they are downloaded |
-| `POST /v1/read` | bearer | Read one photo (`multipart/form-data`: `image`, and `profile` or `profile_name`) |
+| `POST /v1/read` | bearer | Read one photo (`multipart/form-data`: `image`, and `profile` or `profile_name`; `open_reading=1` adds `other_texts`, see [open-reading.md](open-reading.md)) |
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" \
