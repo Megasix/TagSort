@@ -186,6 +186,60 @@ class Tag:
         }
 
 
+TextKind = Literal["id", "header", "noise"]
+_TEXT_KINDS = frozenset(get_args(TextKind))
+
+
+@dataclass(frozen=True)
+class OtherText:
+    """A line of text that fits no kind of tag of the profile (open reading).
+
+    Attributes:
+        text: What the recognizer read, without the help of any pattern.
+        confidence: How sure the recognizer is of the characters, in [0, 1].
+        tag_likelihood: How likely the text is a specimen tag, in [0, 1], from generic
+            cues (see ``docs/open-reading.md``); not a calibrated probability yet.
+        kind_guess: ``id`` (looks like a specimen number), ``header`` (printed words) or
+            ``noise`` (rulers, stray marks).
+        polygon: The four corners of the line, clockwise from the top-left corner of the
+            upright text.
+        angle: Orientation of the text, as for :class:`Tag`.
+    """
+
+    text: str
+    confidence: float
+    tag_likelihood: float
+    kind_guess: TextKind
+    polygon: tuple[Point, Point, Point, Point]
+    angle: float
+
+    def __post_init__(self) -> None:
+        """Validate the fields."""
+        _check_text("text", self.text)
+        _check_number("confidence", self.confidence, 0, 1)
+        _check_number("tag_likelihood", self.tag_likelihood, 0, 1)
+        if self.kind_guess not in _TEXT_KINDS:
+            raise ValueError(f"kind_guess must be one of {sorted(_TEXT_KINDS)}")
+        polygon = tuple(tuple(point) for point in self.polygon)
+        if len(polygon) != 4 or any(len(point) != 2 for point in polygon):
+            raise ValueError("polygon must have exactly 4 points of 2 coordinates each")
+        object.__setattr__(self, "polygon", polygon)
+        _check_number("angle", self.angle, 0)
+        if self.angle >= 360:
+            raise ValueError(f"angle must be below 360, not {self.angle}")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the JSON-ready form of this object."""
+        return {
+            "text": self.text,
+            "confidence": self.confidence,
+            "tag_likelihood": self.tag_likelihood,
+            "kind_guess": self.kind_guess,
+            "polygon": [list(point) for point in self.polygon],
+            "angle": self.angle,
+        }
+
+
 @dataclass(frozen=True)
 class ReadResult:
     """Everything TagSort found in one image.
@@ -196,6 +250,8 @@ class ReadResult:
         image: Size and orientation of the image.
         tags: Tags found in the image, possibly none.
         timings_ms: Time spent in each pipeline stage, in milliseconds.
+        other_texts: With open reading, the lines that fit no kind of tag, most likely
+            tags first; empty otherwise (and then absent from the JSON form).
     """
 
     SCHEMA_VERSION: ClassVar[str] = "1.0"
@@ -206,6 +262,7 @@ class ReadResult:
     image: ImageInfo
     tags: tuple[Tag, ...] = ()
     timings_ms: Mapping[str, float] = field(default_factory=dict)
+    other_texts: tuple[OtherText, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate the fields and freeze the collections."""
@@ -223,6 +280,11 @@ class ReadResult:
             _check_text("timings_ms key", stage)
             _check_number(f"timings_ms[{stage!r}]", value, 0)
         object.__setattr__(self, "timings_ms", MappingProxyType(timings))
+        others = tuple(self.other_texts)
+        for other in others:
+            if not isinstance(other, OtherText):
+                raise TypeError(f"other_texts must be OtherText objects, not {other!r}")
+        object.__setattr__(self, "other_texts", others)
 
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-ready form of this result, conforming to ``result.v1.json``."""
@@ -233,6 +295,11 @@ class ReadResult:
             "image": self.image.to_dict(),
             "tags": [tag.to_dict() for tag in self.tags],
             "timings_ms": dict(self.timings_ms),
+            **(
+                {"other_texts": [other.to_dict() for other in self.other_texts]}
+                if self.other_texts
+                else {}
+            ),
         }
 
     def to_json(self, *, indent: int | None = None) -> str:

@@ -9,6 +9,10 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Added
 
+- Open reading: `Reader(open_reading=True)` (server: `open_reading=1`) also returns
+  `other_texts`, the lines that fit no kind of tag, with how likely each is a specimen
+  tag and a guess of what it is (`docs/open-reading.md`). Optional in `result.v1.json`.
+
 - Printed headers: a kind of tag in a profile may have a `header`, text printed on that
   kind of tag (`NATIONAL MUSEUM OF CANADA`). When a reading fits several kinds, the kind
   whose header is seen in the photo is reported (`docs/headers.md`). Optional in

@@ -162,12 +162,17 @@ def create_app(
         if fallback is not None and hasattr(fallback, "close"):
             fallback.close()
 
-    def reader_for(profile: Profile) -> Reader:
-        key = json.dumps(profile.to_dict(), sort_keys=True)
+    def reader_for(profile: Profile, open_reading: bool = False) -> Reader:
+        key = json.dumps(profile.to_dict(), sort_keys=True) + ("+open" if open_reading else "")
         with lock:
             reader = readers.get(key)
             if reader is None:
-                reader = Reader(profile, backend=state["pipeline"], fallback=state.get("fallback"))
+                reader = Reader(
+                    profile,
+                    backend=state["pipeline"],
+                    fallback=state.get("fallback"),
+                    open_reading=open_reading,
+                )
                 readers[key] = reader
                 if len(readers) > _READER_CACHE:
                     readers.popitem(last=False)
@@ -248,6 +253,7 @@ def create_app(
                 raise _ApiError(400, "invalid_request", "the image field is missing")
             data = await upload.read(config.max_upload_bytes + 1)
             profile_text, profile_name = form.get("profile"), form.get("profile_name")
+            open_reading = form.get("open_reading") in ("1", "true")
         finally:
             await form.close()
         if len(data) > config.max_upload_bytes:
@@ -255,7 +261,7 @@ def create_app(
                 413, "too_large", f"photos are limited to {config.max_upload_bytes} bytes"
             )
         profile = _profile(profile_text, profile_name, config.profiles)
-        reader = reader_for(profile)
+        reader = reader_for(profile, open_reading)
         start = time.perf_counter()
         async with state["slots"]:
             try:

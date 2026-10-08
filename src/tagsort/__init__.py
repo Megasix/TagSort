@@ -17,7 +17,16 @@ from tagsort.models import ModelError, available_models, download_model
 from tagsort.pipeline.local import LocalPipeline
 from tagsort.pipeline.reader import Reader
 from tagsort.profile import Profile, TagSpec
-from tagsort.types import Candidate, ImageInfo, Point, ReadResult, Tag, TagSource, TagStatus
+from tagsort.types import (
+    Candidate,
+    ImageInfo,
+    OtherText,
+    Point,
+    ReadResult,
+    Tag,
+    TagSource,
+    TagStatus,
+)
 
 if TYPE_CHECKING:
     from tagsort.fallback.anthropic import AnthropicProvider
@@ -35,6 +44,7 @@ __all__ = [
     "LocalPipeline",
     "ModelError",
     "OpenAIProvider",
+    "OtherText",
     "PatternError",
     "Point",
     "Profile",

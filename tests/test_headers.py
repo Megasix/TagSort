@@ -7,7 +7,7 @@ from tagsort import Profile
 from tagsort.errors import ProfileError
 from tagsort.pipeline.detect import DetectedLine
 from tagsort.pipeline.headers import choose_kind, headers_seen, normalize
-from tagsort.pipeline.local import LineReading, LocalPipeline
+from tagsort.pipeline.local import LineReading, LocalPipeline, PlainLine
 
 PROFILE = Profile.from_dict(
     {
@@ -99,8 +99,10 @@ class _Lines(LocalPipeline):
 
     def _read_line(
         self, image: Image.Image, line: DetectedLine, profile: Profile
-    ) -> tuple[LineReading | None, str]:
-        return next(self._lines)
+    ) -> tuple[LineReading | None, PlainLine]:
+        reading, text = next(self._lines)
+        quad = ((0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (0.0, 5.0))
+        return reading, PlainLine(text=text, confidence=0.9, quad=quad, angle=0.0)
 
 
 def _tag(text: str, tag_id: str) -> LineReading:

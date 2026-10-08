@@ -16,7 +16,7 @@ from tagsort.pipeline.recognize import OnnxRecognizer, Recognizer
 from tagsort.pipeline.runtime import Device
 from tagsort.profile import Profile
 
-__all__ = ["LineReading", "LocalPipeline", "score"]
+__all__ = ["LineReading", "LocalPipeline", "PlainLine", "score"]
 
 DETECTION_SIDE = 1600
 """Working size of detection; on lot-02, 960 px missed small tags and 2,048 px was slower."""
@@ -49,6 +49,20 @@ class LineReading:
     readings: tuple[tuple[str, float, str], ...]
     agrees: bool
     crop: Image.Image
+
+
+@dataclass(frozen=True)
+class PlainLine:
+    """A text line read without any pattern.
+
+    Holds its text, how sure the recognizer is of its characters (geometric mean of their
+    probabilities), and where it is, upright.
+    """
+
+    text: str
+    confidence: float
+    quad: tuple[tuple[float, float], ...]
+    angle: float
 
 
 def score(probability: float, agrees: bool) -> float:
@@ -112,17 +126,27 @@ class LocalPipeline:
 
     def read(self, image: Image.Image, profile: Profile) -> list[LineReading]:
         """Return the lines of an upright image that read as a tag of ``profile``."""
+        return self.read_all(image, profile)[0]
+
+    def read_all(
+        self, image: Image.Image, profile: Profile
+    ) -> tuple[list[LineReading], list[PlainLine]]:
+        """Return the lines that read as a tag, and every other line as plain text.
+
+        The other lines are for open reading (``docs/open-reading.md``).
+        """
         results = [self._read_line(image, line, profile) for line in self._detector.detect(image)]
         readings = [reading for reading, _ in results if reading is not None]
-        if not any(tag.header for tag in profile.tags):
-            return readings
-        # Printed headers choose between kinds that accept the same reading.
-        seen = headers_seen(profile, (text for _, text in results))
-        return [_with_kinds(reading, profile, seen) for reading in readings]
+        others = [plain for reading, plain in results if reading is None and plain.text.strip()]
+        if any(tag.header for tag in profile.tags):
+            # Printed headers choose between kinds that accept the same reading.
+            seen = headers_seen(profile, (plain.text for _, plain in results))
+            readings = [_with_kinds(reading, profile, seen) for reading in readings]
+        return readings, others
 
     def _read_line(
         self, image: Image.Image, line: DetectedLine, profile: Profile
-    ) -> tuple[LineReading | None, str]:
+    ) -> tuple[LineReading | None, PlainLine]:
         """Read one line: as a tag when it reads as one, and as plain text in any case."""
         tl, tr, br, bl = line.quad
         width = max(2, round(math.dist(tl, tr)))
@@ -138,26 +162,35 @@ class LocalPipeline:
         turns = (0, 180, 90, 270) if height > width * 1.2 else (0, 180)
         best: dict[str, tuple[float, str, int]] = {}
         agreeing: dict[int, str] = {}
-        plain = ("", 0.0)
+        plain = ("", 0.0, 0)
         for turn in turns:
             upright = crop.rotate(turn, expand=True)
             probs = self._recognizer.probabilities(upright)
             unconstrained = greedy(probs, self._recognizer.classes)
             agreeing[turn] = unconstrained.text.replace(" ", "")
-            if unconstrained.probability > plain[1]:
-                plain = (unconstrained.text, unconstrained.probability)
+            # Per character, so turns reading texts of different lengths compare fairly.
+            sureness = unconstrained.probability ** (1 / max(1, len(unconstrained.text)))
+            if sureness > plain[1]:
+                plain = (unconstrained.text, sureness, turn)
             for spec in profile.tags:
                 for reading in constrained(probs, self._recognizer.classes, spec._automaton)[
                     :CANDIDATES_PER_LINE
                 ]:
                     if reading.probability > best.get(reading.text, (0.0, "", 0))[0]:
                         best[reading.text] = (reading.probability, spec.id, turn)
-        ranked = sorted(best.items(), key=lambda item: item[1][0], reverse=True)
-        if not ranked or ranked[0][1][0] < MIN_LINE_PROBABILITY:
-            return None, plain[0]
-        text, (_, _, turn) = ranked[0]
         base = math.degrees(math.atan2(tr[1] - tl[1], tr[0] - tl[0]))
         corners = [tl, tr, br, bl]
+        plain_shift = plain[2] // 90
+        plain_line = PlainLine(
+            text=plain[0],
+            confidence=min(1.0, plain[1]),
+            quad=tuple(corners[plain_shift:] + corners[:plain_shift]),
+            angle=(base + plain[2]) % 360,
+        )
+        ranked = sorted(best.items(), key=lambda item: item[1][0], reverse=True)
+        if not ranked or ranked[0][1][0] < MIN_LINE_PROBABILITY:
+            return None, plain_line
+        text, (_, _, turn) = ranked[0]
         shift = turn // 90
         tag_line = LineReading(
             quad=tuple(corners[shift:] + corners[:shift]),
@@ -169,7 +202,7 @@ class LocalPipeline:
             agrees=agreeing[turn] == text,
             crop=crop.rotate(turn, expand=True),
         )
-        return tag_line, plain[0]
+        return tag_line, plain_line
 
 
 def _with_kinds(reading: LineReading, profile: Profile, seen: frozenset[str]) -> LineReading:

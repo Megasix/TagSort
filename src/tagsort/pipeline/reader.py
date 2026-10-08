@@ -14,10 +14,11 @@ from tagsort._version import __version__
 from tagsort.errors import ProviderError
 from tagsort.fallback.base import ProviderTag, VisionProvider, VisionRequest
 from tagsort.fallback.prompt import ANSWER_SCHEMA, build_instructions
-from tagsort.pipeline.local import LineReading, LocalPipeline, score
+from tagsort.pipeline.local import LineReading, LocalPipeline, PlainLine, score
+from tagsort.pipeline.openread import tag_likelihood
 from tagsort.pipeline.preprocess import ImageSource, PreparedImage, encode_jpeg, prepare
 from tagsort.profile import Profile
-from tagsort.types import Candidate, ImageInfo, Point, ReadResult, Tag, TagStatus
+from tagsort.types import Candidate, ImageInfo, OtherText, Point, ReadResult, Tag, TagStatus
 
 __all__ = ["Reader"]
 
@@ -52,6 +53,9 @@ class Reader:
         accept_threshold: Minimum confidence for the ``accepted`` status.
         review_threshold: Minimum confidence for the ``review`` status; readings below it
             are ``unreadable`` and kept only as candidates.
+        open_reading: With a local backend, also return in ``other_texts`` the lines that
+            fit no kind of tag, each with how likely it is a specimen tag
+            (``docs/open-reading.md``). Off by default.
 
     Raises:
         ValueError: If the thresholds are not ``0 <= review <= accept <= 1``, or a
@@ -67,6 +71,7 @@ class Reader:
         fallback: VisionProvider | None = None,
         accept_threshold: float = 0.9,
         review_threshold: float = 0.25,
+        open_reading: bool = False,
     ) -> None:
         """Create the reader."""
         if not isinstance(profile, Profile):
@@ -93,6 +98,7 @@ class Reader:
         self._profile = profile
         self._accept = accept_threshold
         self._review = review_threshold
+        self._open_reading = open_reading
 
     @property
     def profile(self) -> Profile:
@@ -182,7 +188,10 @@ class Reader:
         start = time.perf_counter()
         prepared = prepare(image, max_side=LOCAL_MAX_SIDE)
         prepared_at = time.perf_counter()
-        lines = local.read(prepared.image, self._profile)
+        if self._open_reading:
+            lines, plain = local.read_all(prepared.image, self._profile)
+        else:
+            lines, plain = local.read(prepared.image, self._profile), []
         read_at = time.perf_counter()
         tags = []
         fallback_seconds = 0.0
@@ -209,6 +218,7 @@ class Reader:
             image=ImageInfo(prepared.width, prepared.height, prepared.exif_rotation),
             tags=tuple(tags),
             timings_ms=timings,
+            other_texts=_other_texts(plain, prepared),
         )
 
     def _local_tag(self, line: LineReading, prepared: PreparedImage) -> Tag:
@@ -384,3 +394,24 @@ def _polygon(
     shift = angle // 90
     rotated = corners[shift:] + corners[:shift]
     return (rotated[0], rotated[1], rotated[2], rotated[3])
+
+
+def _other_texts(lines: list[PlainLine], prepared: PreparedImage) -> tuple[OtherText, ...]:
+    """Lines no kind of tag fits, most likely specimen tags first (open reading)."""
+    others = []
+    for line in lines:
+        text = " ".join(line.text.split())
+        if not text:
+            continue
+        likelihood, kind = tag_likelihood(text)
+        others.append(
+            OtherText(
+                text=text,
+                confidence=round(line.confidence, 4),
+                tag_likelihood=likelihood,
+                kind_guess=kind,
+                polygon=_scale(line.quad, prepared.scale),
+                angle=round(line.angle, 1) % 360,
+            )
+        )
+    return tuple(sorted(others, key=lambda other: other.tag_likelihood, reverse=True))

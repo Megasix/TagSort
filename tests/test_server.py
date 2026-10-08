@@ -23,7 +23,7 @@ from tagsort import (
     VisionRequest,
 )
 from tagsort.fallback.base import BoxFormat
-from tagsort.pipeline.local import LineReading, LocalPipeline
+from tagsort.pipeline.local import LineReading, LocalPipeline, PlainLine
 from tagsort.server import ServerConfig, create_app
 from tests.helpers import load_schema
 
@@ -70,6 +70,15 @@ class StubPipeline(LocalPipeline):
                 agrees=True,
                 crop=Image.new("RGB", (80, 20), "white"),
             )
+        ]
+
+    def read_all(
+        self, image: Image.Image, profile: Profile
+    ) -> tuple[list[LineReading], list[PlainLine]]:
+        quad = ((10.0, 40.0), (90.0, 40.0), (90.0, 60.0), (10.0, 60.0))
+        return self.read(image, profile), [
+            PlainLine(text="NATIONAL MUSEUM", confidence=0.8, quad=quad, angle=0.0),
+            PlainLine(text="15950-1", confidence=0.9, quad=quad, angle=0.0),
         ]
 
 
@@ -351,3 +360,26 @@ def test_ping_answers_once_the_model_is_loaded() -> None:
     with client() as c:
         response = c.get("/ping")
     assert (response.status_code, response.json()) == (200, {"status": "ok"})
+
+
+def test_open_reading_adds_the_other_lines_most_likely_tags_first() -> None:
+    with client() as c:
+        plain = c.post(
+            "/v1/read",
+            headers=AUTH,
+            files={"image": ("p.png", png())},
+            data={"profile_name": "lot"},
+        ).json()
+        opened = c.post(
+            "/v1/read",
+            headers=AUTH,
+            files={"image": ("p.png", png())},
+            data={"profile_name": "lot", "open_reading": "1"},
+        ).json()
+    assert "other_texts" not in plain
+    check({"$ref": "result.v1.json"}, opened)
+    assert [(o["text"], o["kind_guess"]) for o in opened["other_texts"]] == [
+        ("15950-1", "id"),
+        ("NATIONAL MUSEUM", "header"),
+    ]
+    assert opened["tags"] == plain["tags"]

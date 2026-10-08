@@ -32,9 +32,55 @@
       "type": "object",
       "propertyNames": { "minLength": 1 },
       "additionalProperties": { "type": "number", "minimum": 0 }
+    },
+    "other_texts": {
+      "description": "Only with open reading (docs/open-reading.md): lines of text that fit no kind of tag of the profile, most likely tags first. Absent otherwise.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/otherText" }
     }
   },
   "$defs": {
+    "otherText": {
+      "type": "object",
+      "required": ["text", "confidence", "tag_likelihood", "kind_guess", "polygon", "angle"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "What the recognizer read, without the help of any pattern.",
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "description": "How sure the recognizer is of the characters, in [0, 1].",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "tag_likelihood": {
+          "description": "How likely the text is a specimen tag, in [0, 1], from generic cues; not a calibrated probability yet.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "kind_guess": {
+          "description": "id: looks like a specimen number. header: printed words. noise: rulers, stray marks.",
+          "enum": ["id", "header", "noise"]
+        },
+        "polygon": {
+          "description": "Corners of the line, clockwise, starting at the top-left corner of the upright text.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/point" },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "angle": {
+          "description": "Clockwise rotation in degrees from upright, in [0, 360).",
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        }
+      }
+    },
     "image": {
       "type": "object",
       "required": ["width", "height", "exif_rotation"],
