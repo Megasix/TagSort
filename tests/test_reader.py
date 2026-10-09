@@ -88,6 +88,16 @@ def test_alternative_that_fits_the_profile_wins_over_one_that_does_not() -> None
     assert [c.text for c in tag.candidates] == ["MDO4127"]
 
 
+def test_a_gap_in_the_tag_does_not_count() -> None:
+    (tag,) = read(raw("MD 04127", alternatives=("MD 04121",))).tags
+    assert (tag.tag_id, tag.text, tag.status) == ("primary", "MD04127", "accepted")
+    (tag,) = read(raw("MD 04127", "uncertain", ("MD 04121",))).tags
+    assert [c.text for c in tag.candidates] == ["MD04121"]
+    # Text that fits no kind of tag, with or without its spaces, keeps them.
+    (tag,) = read(raw("NEW BRUNSWICK")).tags
+    assert tag.text == "NEW BRUNSWICK"
+
+
 def test_reading_outside_the_profile_is_never_accepted() -> None:
     (tag,) = read(raw("HELLO"), accept_threshold=0.1, review_threshold=0.0).tags
     assert tag.status == "review"

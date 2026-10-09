@@ -9,7 +9,7 @@ import pytest
 from tagsort.grammar import compile_pattern
 from tagsort.grammar.decode import Reading, constrained, greedy
 
-CLASSES = ("", "G", "J", "O", "0", "6", "7", "9")  # blank first, like PP-OCR
+CLASSES = ("", "G", "J", "O", "0", "6", "7", "9", " ")  # blank first, like PP-OCR
 
 
 def frames(*rows: dict[str, float]) -> np.ndarray:
@@ -73,6 +73,27 @@ def test_readings_are_sorted_and_unique() -> None:
     assert len({r.text for r in readings}) == len(readings)
 
 
+def test_a_space_the_pattern_does_not_allow_does_not_count() -> None:
+    probs = spell("GJ 07966")
+    assert greedy(probs, CLASSES).text == "GJ 07966"
+    (best, *_) = constrained(probs, CLASSES, compile_pattern(r"GJ\d{5}"))
+    assert best.text == "GJ07966"
+    # As likely as the same tag written without the gap.
+    (plain, *_) = constrained(spell("GJ07966"), CLASSES, compile_pattern(r"GJ\d{5}"))
+    assert best.probability == pytest.approx(plain.probability, rel=0.05)
+
+
+def test_a_space_separates_repeated_characters() -> None:
+    (best, *_) = constrained(spell("66 6"), CLASSES, compile_pattern(r"\d{3}"))
+    assert best.text == "666"
+
+
+def test_a_space_the_pattern_has_is_a_character() -> None:
+    (best, *_) = constrained(spell("GJ 07966"), CLASSES, compile_pattern(r"GJ \d{5}"))
+    assert best.text == "GJ 07966"
+    assert constrained(spell("GJ07966"), CLASSES, compile_pattern(r"GJ \d{5}")) == []
+
+
 def exact_label_probabilities(probs: np.ndarray, classes: tuple[str, ...]) -> dict[str, float]:
     """Sum the probability of every alignment, grouped by the label it collapses to."""
     totals: dict[str, float] = {}
@@ -103,6 +124,24 @@ def test_matches_exhaustive_computation(seed: int) -> None:
     for reading in readings:
         assert reading.probability == pytest.approx(exact[reading.text], rel=1e-9)
     assert readings[0].text == max(exact, key=exact.__getitem__)
+
+
+@pytest.mark.parametrize("seed", range(25))
+def test_ignored_spaces_match_exhaustive_computation(seed: int) -> None:
+    classes = ("", "6", "7", " ")
+    rng = np.random.default_rng(seed)
+    probs = rng.dirichlet(np.ones(len(classes)) * 0.6, size=6)
+    automaton = compile_pattern("[67]{2,3}")
+    # Collapse each alignment as usual, then drop the spaces the pattern does not allow.
+    exact: dict[str, float] = {}
+    for text, p in exact_label_probabilities(probs, classes).items():
+        text = text.replace(" ", "")
+        if automaton.matches(text):
+            exact[text] = exact.get(text, 0.0) + p
+    readings = constrained(probs, classes, automaton, beam=64, min_char_probability=0.0)
+    assert {r.text for r in readings} == set(exact)
+    for reading in readings:
+        assert reading.probability == pytest.approx(exact[reading.text], rel=1e-9)
 
 
 def test_reading_is_a_value() -> None:

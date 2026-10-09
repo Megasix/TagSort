@@ -33,6 +33,12 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Changed
 
+- A space where a pattern allows none no longer counts against a reading: written or
+  printed tags often have a gap (`GJ 07966`). The local decoder reads such a space as a
+  separator, and vision API answers that fit only without their spaces are kept without
+  them, so the tag comes out as `GJ07966` with the confidence of a tag without the gap.
+  Spaces a pattern contains are still required (`docs/patterns.md`).
+
 - A profile may list no kinds of tag (`"tags": []` in `profile.v1.json`, which no longer
   sets `minItems`). Nothing is read as a tag, and open reading returns every line in
   `other_texts`, so a collection can be read before its tags are described. Profiles

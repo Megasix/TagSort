@@ -159,6 +159,18 @@ def test_fallback_reads_doubtful_tags_from_their_crop(
     result_validator.validate(result.to_dict())
 
 
+def test_fallback_answers_with_a_gap_fit_without_it() -> None:
+    fallback = FakeFallback(tags=(raw("GJ 07966"),))
+    doubtful = line(("GJ07968", 0.04, "primary"), agrees=False)
+    (tag,) = read(StubPipeline(doubtful), fallback).tags
+    assert (tag.text, tag.tag_id, tag.status, tag.source) == (
+        "GJ07966",
+        "primary",
+        "accepted",
+        "fallback",
+    )
+
+
 def test_fallback_answers_that_do_not_help_keep_the_local_tag() -> None:
     doubtful = line(("GJ07968", 0.4, "primary"), agrees=False)
     for fallback in (

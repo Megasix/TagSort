@@ -9,6 +9,11 @@ spell it.
 character the automaton allows next, and only texts the automaton accepts are returned.
 It is what makes a recognizer read ``GJ07966`` where an unconstrained reading would say
 ``GJO7966``.
+
+A space where the pattern allows none does not count against a reading: tags are often
+written or printed with a gap (``GJ 07966``), so such a space is read like a blank, as a
+separator, and the text comes out without it. Where the pattern has a space, it is a
+character like any other.
 """
 
 from __future__ import annotations
@@ -71,9 +76,11 @@ def constrained(
 
     Returns:
         Readings sorted by decreasing probability, each text once; empty when no text
-        accepted by the automaton is possible.
+        accepted by the automaton is possible. Spaces the pattern does not allow are left
+        out of the texts (see the module docstring).
     """
     index = {char: k for k, char in enumerate(classes) if k != 0}
+    space = index.get(" ")
     # prefix -> [probability ending in blank, probability ending in a character, state]
     beams: dict[str, list[float]] = {"": [1.0, 0.0, float(automaton.start)]}
     for row in probs:
@@ -82,8 +89,12 @@ def constrained(
         for prefix, (p_blank, p_char, state_value) in beams.items():
             state = int(state_value)
             total = p_blank + p_char
-            # Emit a blank: the text does not change.
-            _add(grown, prefix, state, total * blank, 0.0)
+            # Emit a blank, or a space the pattern does not allow here: the text does not
+            # change, and a character repeated after it counts twice.
+            separator = blank
+            if space is not None and " " not in automaton.allowed(state):
+                separator += float(row[space])
+            _add(grown, prefix, state, total * separator, 0.0)
             if prefix:
                 # Repeat the last character without a blank: it collapses into one.
                 _add(grown, prefix, state, 0.0, p_char * float(row[index[prefix[-1]]]))
