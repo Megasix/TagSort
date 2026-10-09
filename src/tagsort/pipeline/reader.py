@@ -272,7 +272,8 @@ class Reader:
         except ProviderError as error:
             logger.warning("fallback failed, keeping the local reading: %s", error)
             return local
-        valid = [raw for raw in answer.tags if self._profile.match(raw.text) is not None]
+        fitted = [self._without_stray_spaces(raw) for raw in answer.tags]
+        valid = [raw for raw in fitted if self._profile.match(raw.text) is not None]
         if not valid:
             return local
         raw = max(valid, key=lambda r: r.legibility == "certain")
@@ -291,7 +292,7 @@ class Reader:
         )
 
     def _to_tag(self, raw: ProviderTag, prepared: PreparedImage) -> Tag:
-        raw = self._flag_upside_down_ambiguity(raw)
+        raw = self._flag_upside_down_ambiguity(self._without_stray_spaces(raw))
         readings = [raw.text, *raw.alternatives] if raw.text else list(raw.alternatives)
         scored = [(text, self._score(raw, index, text)) for index, text in enumerate(readings)]
         if raw.legibility == "unreadable":
@@ -322,6 +323,23 @@ class Reader:
                 for rank, (text, score) in enumerate(others)
             ),
             source="fallback",
+        )
+
+    def _without_stray_spaces(self, raw: ProviderTag) -> ProviderTag:
+        """Drop the spaces of readings that fit the profile only without them.
+
+        A gap in a written or printed tag (``GJ 07966``) is not a character: the local
+        decoder ignores spaces a pattern does not allow, and so does this, for providers.
+        """
+
+        def fit(text: str) -> str:
+            if self._profile.match(text) is not None:
+                return text
+            compact = "".join(text.split())
+            return compact if self._profile.match(compact) is not None else text
+
+        return replace(
+            raw, text=fit(raw.text), alternatives=tuple(fit(text) for text in raw.alternatives)
         )
 
     def _flag_upside_down_ambiguity(self, raw: ProviderTag) -> ProviderTag:
