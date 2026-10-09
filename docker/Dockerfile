@@ -6,7 +6,9 @@
 #
 # Configuration: see docs/server.md. No photo, key or token is ever stored in the image.
 
-FROM python:3.12-slim AS build
+# Docker Hub's official Python image, through Google's mirror: CI builds are not
+# rate-limited there as anonymous Docker Hub pulls are.
+FROM mirror.gcr.io/library/python:3.12-slim AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 RUN pip install --no-cache-dir "uv==0.12.*"
 WORKDIR /app
@@ -18,7 +20,7 @@ ENV TAGSORT_MODELS=/models
 RUN /app/.venv/bin/tagsort models download ppocrv6-tiny \
  && /app/.venv/bin/tagsort models download ppocrv6-small
 
-FROM python:3.12-slim
+FROM mirror.gcr.io/library/python:3.12-slim
 LABEL org.opencontainers.image.source="https://github.com/Megasix/TagSort" \
       org.opencontainers.image.description="Reads specimen ID tags in photos" \
       org.opencontainers.image.licenses="Apache-2.0"
