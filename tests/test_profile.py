@@ -49,7 +49,6 @@ SCHEMA_INVALID: list[tuple[str, Any, str | None]] = [
     ("boolean count", with_change(("tags_per_individual",), True), "tags_per_individual"),
     ("string count", with_change(("tags_per_individual",), "2"), "tags_per_individual"),
     ("tags not a list", with_change(("tags",), {"id": "a"}), "tags"),
-    ("no tags", with_change(("tags",), []), "tags"),
     ("tag not an object", with_change(("tags", 1), "MD"), "tags[1]"),
     ("tag missing id", with_change(("tags", 0, "id"), DELETE), "tags[0].id"),
     ("tag missing pattern", with_change(("tags", 1, "pattern"), DELETE), "tags[1].pattern"),
@@ -68,6 +67,8 @@ SCHEMA_INVALID: list[tuple[str, Any, str | None]] = [
 SCHEMA_VALID: list[tuple[str, Any]] = [
     ("museum_a", museum_a()),
     ("one tag", with_change(("tags",), [{"id": "only", "pattern": "[A-Z]{3}"}])),
+    # A collection whose kinds of tag are not known yet: read with open reading.
+    ("no tags yet", with_change(("tags",), [])),
     ("id at max length", with_change(("tags", 0, "id"), "a" + "_-9" * 21)),
     ("unicode name", with_change(("name",), "Muséum d'histoire naturelle")),
     ("large count", with_change(("tags_per_individual",), 12)),

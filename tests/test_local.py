@@ -212,3 +212,17 @@ def test_reads_a_rendered_tag_end_to_end_with_the_real_model(
     )
     assert 170 <= found.angle <= 190
     result_validator.validate(result.to_dict())
+
+
+def test_a_profile_without_tags_returns_every_line_as_other_text() -> None:
+    try:
+        model_files(DEFAULT_MODEL)
+    except ModelError:
+        pytest.skip("run `tagsort models download` to test with the real model")
+    image = Image.new("RGB", (1600, 1200), (230, 225, 210))
+    font = ImageFont.load_default(size=56)
+    ImageDraw.Draw(image).text((300, 400), "GJ08104", fill="black", font=font)
+    empty = Profile(name="New collection", tags_per_individual=1, tags=())
+    result = Reader(empty, open_reading=True).read(image)
+    assert result.tags == ()
+    assert "GJ08104" in [other.text for other in result.other_texts]

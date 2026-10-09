@@ -33,6 +33,12 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Changed
 
+- A profile may list no kinds of tag (`"tags": []` in `profile.v1.json`, which no longer
+  sets `minItems`). Nothing is read as a tag, and open reading returns every line in
+  `other_texts`, so a collection can be read before its tags are described. Profiles
+  valid before stay valid; the vision API prompt leaves out the patterns when there are
+  none.
+
 - GPU image: NVIDIA development headers are removed, except those the CUDA agreement lists
   as distributable, and the image's license label reads
   `Apache-2.0 AND LicenseRef-NVIDIA-Proprietary`.

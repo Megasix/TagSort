@@ -106,7 +106,9 @@ class Profile:
     Attributes:
         name: Human-readable name of the profile.
         tags_per_individual: Number of tags attached to one specimen.
-        tags: The kinds of tag found in this collection, with unique ids.
+        tags: The kinds of tag found in this collection, with unique ids. May be empty:
+            no line is then read as a tag, and open reading returns every line as other
+            text (``docs/open-reading.md``).
 
     Raises:
         ProfileError: If a field is invalid. :class:`PatternError`, a subclass, is raised
@@ -128,8 +130,6 @@ class Profile:
         if not isinstance(count, int) or isinstance(count, bool) or count < 1:
             raise ProfileError("must be an integer of at least 1", location="tags_per_individual")
         tags = tuple(self.tags)
-        if not tags:
-            raise ProfileError("must list at least one tag", location="tags")
         seen: set[str] = set()
         for index, tag in enumerate(tags):
             if not isinstance(tag, TagSpec):

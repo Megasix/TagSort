@@ -15,6 +15,11 @@ for other in result.other_texts:
 
 The server takes `open_reading=1` in the `POST /v1/read` form.
 
+A profile may list no kinds of tag at all (`"tags": []`), for a collection whose tags are
+not described yet. Nothing is then read as a tag: `tags` is empty and, with open reading,
+every line comes back in `other_texts`. People keep the tags among them, and the
+application can turn what they kept into the profile's first kinds of tag.
+
 ## What comes back
 
 `other_texts` (`result.v1.json`, present only with open reading) lists every line that fits
