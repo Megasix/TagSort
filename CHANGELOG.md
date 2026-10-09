@@ -9,6 +9,11 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Added
 
+- NOTICE lists the third-party components of the Docker images: the PP-OCRv6 models
+  (Apache 2.0, PaddlePaddle Authors) in both, and NVIDIA's CUDA and cuDNN libraries in the
+  GPU image, which stay under NVIDIA's license agreements. Both images now ship LICENSE
+  and NOTICE in `/app`.
+
 - Open reading: `Reader(open_reading=True)` (server: `open_reading=1`) also returns
   `other_texts`, the lines that fit no kind of tag, with how likely each is a specimen
   tag and a guess of what it is (`docs/open-reading.md`). Optional in `result.v1.json`.
@@ -27,6 +32,10 @@ separately: a breaking change creates a new major version of the schema.
   `ghcr.io/megasix/tagsort:<version>-gpu`.
 
 ### Changed
+
+- GPU image: NVIDIA development headers are removed, except those the CUDA agreement lists
+  as distributable, and the image's license label reads
+  `Apache-2.0 AND LicenseRef-NVIDIA-Proprietary`.
 
 - On a GPU, ONNX Runtime's CUDA provider picks cuDNN convolution algorithms heuristically
   instead of benchmarking them again for every new text-line width.

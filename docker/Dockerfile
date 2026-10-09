@@ -25,6 +25,7 @@ LABEL org.opencontainers.image.source="https://github.com/Megasix/TagSort" \
 RUN useradd --create-home --uid 10001 tagsort
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /models /models
+COPY --from=build /app/LICENSE /app/NOTICE /app/
 ENV PATH="/app/.venv/bin:$PATH" \
     TAGSORT_MODELS=/models \
     TAGSORT_MODEL=ppocrv6-small \
