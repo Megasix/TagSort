@@ -22,9 +22,8 @@
       "minimum": 1
     },
     "tags": {
-      "description": "The kinds of tag found in this collection.",
+      "description": "The kinds of tag found in this collection. May be empty: no line is then read as a tag, and open reading returns every line as other text.",
       "type": "array",
-      "minItems": 1,
       "items": { "$ref": "#/$defs/tag" }
     }
   },

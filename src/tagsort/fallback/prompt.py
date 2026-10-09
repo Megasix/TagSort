@@ -57,6 +57,17 @@ _BOX_HELP: dict[BoxFormat, str] = {
 def build_instructions(profile: Profile, *, box_format: BoxFormat, width: int, height: int) -> str:
     """Return the instructions sent with every image for ``profile``."""
     patterns = "\n".join(f"- {tag.id}: {tag.pattern}" for tag in profile.tags)
+    # A profile with no kinds of tag yet has no patterns to help with.
+    formats = (
+        f"""In this collection, tag texts follow these regular expressions:
+{patterns}
+Use them to choose between similar-looking characters, such as 0 and O or 1 and I. If a \
+tag does not match any of them, report it as written and mark it "uncertain".
+
+"""
+        if patterns
+        else ""
+    )
     box_help = _BOX_HELP[box_format].format(width=width, height=height)
     return f"""\
 This photo shows a natural history specimen with identification tags: small labels, \
@@ -73,12 +84,7 @@ Empty list if there are none.
 - angle: orientation of the text, clockwise from upright. "0" reads left to right, \
 "90" reads top to bottom, "180" is upside down, "270" reads bottom to top.
 
-In this collection, tag texts follow these regular expressions:
-{patterns}
-Use them to choose between similar-looking characters, such as 0 and O or 1 and I. If a \
-tag does not match any of them, report it as written and mark it "uncertain".
-
-Report only identification tags, not other text in the photo such as rulers or color \
+{formats}Report only identification tags, not other text in the photo such as rulers or color \
 charts. If there is no tag, return an empty list."""
 
 

@@ -33,6 +33,13 @@ def test_instructions_list_the_profile_patterns() -> None:
     assert "Never correct" in text
 
 
+def test_instructions_without_patterns_leave_them_out() -> None:
+    profile = Profile(name="New collection", tags_per_individual=1, tags=())
+    text = build_instructions(profile, box_format="pixels_xyxy", width=640, height=480)
+    assert "regular expressions" not in text
+    assert "Report only identification tags" in text
+
+
 @pytest.mark.parametrize(
     ("box_format", "expected"),
     [("normalized_xyxy", "[x_min, y_min"), ("normalized_yxyx", "[y_min, x_min")],
