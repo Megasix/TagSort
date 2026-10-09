@@ -128,6 +128,8 @@ jobs:
       - name: Read on the CPU fallback
         run: |
           docker run --rm --entrypoint python tagsort-gpu -c "import onnxruntime as o; p = o.get_available_providers(); print(p); assert 'CUDAExecutionProvider' in p"
+          # Third-party notices ship with the image; NVIDIA development headers do not.
+          docker run --rm --entrypoint sh tagsort-gpu -c 'test -f /app/NOTICE && test -f /app/LICENSE && ls /app/.venv/lib/python3.12/site-packages/nvidia_cudnn_cu13-*.dist-info/licenses/License.txt && ! ls /app/.venv/lib/python3.12/site-packages/nvidia/cudnn/include/*.h 2>/dev/null'
           python3 -c "import json; json.dump(json.load(open('reference/pipeline.v1.json'))['profile'], open('reference/profile.json', 'w'))"
           docker run --rm -v "$PWD/reference:/data:ro" tagsort-gpu read /data/images/upright.png --profile /data/profile.json --model ppocrv6-tiny | tee out.jsonl
           python3 -c "import json; tags = json.loads(open('out.jsonl').readline())['result']['tags']; assert [t['text'] for t in tags] == ['GJ07966'], tags"

@@ -4,8 +4,9 @@
 #   docker run --gpus all -p 8000:8000 -e TAGSORT_API_TOKEN=... tagsort:gpu
 #
 # The host needs an NVIDIA driver for CUDA 13 (R580 or later); CUDA and cuDNN themselves come
-# from NVIDIA's pip wheels, under NVIDIA's licenses. Without a usable GPU the server logs a
-# warning and reads on the CPU (TAGSORT_DEVICE=auto). See docs/server.md.
+# from NVIDIA's pip wheels, under NVIDIA's licenses, not Apache 2.0 (see NOTICE). Without a
+# usable GPU the server logs a warning and reads on the CPU (TAGSORT_DEVICE=auto). See
+# docs/server.md.
 
 FROM python:3.12-slim AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
@@ -13,11 +14,14 @@ RUN pip install --no-cache-dir "uv==0.12.*"
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 COPY src ./src
+COPY docker/prune_nvidia_headers.py ./
 RUN uv sync --frozen --no-dev --no-editable --extra server --extra api
 # Swap the CPU build of ONNX Runtime for the GPU build of the same version.
 RUN version="$(/app/.venv/bin/python -c 'import onnxruntime; print(onnxruntime.__version__)')" \
  && uv pip uninstall --python /app/.venv/bin/python onnxruntime \
  && uv pip install --python /app/.venv/bin/python "onnxruntime-gpu[cuda,cudnn]==$version"
+# Only the NVIDIA files their agreements let us redistribute: no development headers.
+RUN /app/.venv/bin/python prune_nvidia_headers.py /app/.venv/lib/python3.12/site-packages/nvidia
 ENV TAGSORT_MODELS=/models
 RUN /app/.venv/bin/tagsort models download ppocrv6-tiny \
  && /app/.venv/bin/tagsort models download ppocrv6-small
@@ -25,10 +29,11 @@ RUN /app/.venv/bin/tagsort models download ppocrv6-tiny \
 FROM python:3.12-slim
 LABEL org.opencontainers.image.source="https://github.com/Megasix/TagSort" \
       org.opencontainers.image.description="Reads specimen ID tags in photos, on an NVIDIA GPU" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-NVIDIA-Proprietary"
 RUN useradd --create-home --uid 10001 tagsort
 COPY --from=build /app/.venv /app/.venv
 COPY --from=build /models /models
+COPY --from=build /app/LICENSE /app/NOTICE /app/
 # One GPU reads photos one after another fast enough; two in flight keep it busy while the
 # next photo is decoded.
 ENV PATH="/app/.venv/bin:$PATH" \

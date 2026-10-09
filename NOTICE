@@ -3,3 +3,49 @@ Copyright 2026 Barry Lawson
 
 This product is licensed under the Apache License, Version 2.0.
 See the LICENSE file for the full license text.
+
+
+Third-party components
+======================
+
+The Python package depends on third-party packages, each under its own license; their
+license files are installed with them (`*.dist-info/`). The Docker images also contain the
+components below, which are not covered by TagSort's license.
+
+
+Models (both Docker images)
+---------------------------
+
+PP-OCRv6 tiny and small text detection and recognition models, in ONNX format, unmodified.
+Copyright PaddlePaddle Authors. Licensed under the Apache License, Version 2.0.
+Sources (pinned revisions are in src/tagsort/models/manifests/):
+  https://huggingface.co/PaddlePaddle/PP-OCRv6_tiny_det_onnx
+  https://huggingface.co/PaddlePaddle/PP-OCRv6_tiny_rec_onnx
+  https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx
+  https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx
+
+
+NVIDIA libraries (GPU image only)
+---------------------------------
+
+The GPU image contains NVIDIA's CUDA runtime, cuBLAS, cuFFT, cuRAND, NVRTC, nvJitLink and
+cuDNN libraries, unmodified, as installed from NVIDIA's pip wheels (nvidia-cuda-runtime,
+nvidia-cublas, nvidia-cufft, nvidia-curand, nvidia-cuda-nvrtc, nvidia-nvjitlink,
+nvidia-cudnn-cu13). Copyright NVIDIA Corporation and its licensors.
+
+These libraries are NOT licensed under the Apache License. They are distributed under
+NVIDIA's license agreements: the CUDA Toolkit End User License Agreement and the Software
+License Agreement for NVIDIA Software Development Kits with its cuDNN supplement. The full
+texts, including the third-party notices for code inside these libraries, are in the
+image at /app/.venv/lib/python3.12/site-packages/nvidia_*.dist-info/licenses/License.txt,
+and online at https://docs.nvidia.com/cuda/eula/ and
+https://docs.nvidia.com/deeplearning/cudnn/latest/reference/eula.html.
+
+Under those agreements, among other terms:
+  - the libraries may be used only by TagSort, on systems with NVIDIA GPUs;
+  - they may not be redistributed on their own, modified, reverse engineered or
+    decompiled;
+  - they are subject to United States export laws.
+
+Only the portions NVIDIA identifies as distributable are kept: development header files
+are removed from the image, except those its CUDA agreement lists.
