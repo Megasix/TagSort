@@ -8,6 +8,7 @@ from jsonschema import Draft202012Validator
 from PIL import Image, ImageDraw, ImageFont
 
 from tagsort import (
+    ApiUsage,
     ModelError,
     Profile,
     ProviderError,
@@ -238,3 +239,23 @@ def test_a_profile_without_tags_returns_every_line_as_other_text() -> None:
     result = Reader(empty, open_reading=True).read(image)
     assert result.tags == ()
     assert "GJ08104" in [other.text for other in result.other_texts]
+
+
+def test_the_fallback_bill_is_reported(result_validator: Draft202012Validator) -> None:
+    fallback = FakeFallback(tags=(raw("GJ07966"),))
+    pipeline = StubPipeline(
+        line(("GJ07968", 0.4, "primary"), agrees=False),
+        line(("GJ07969", 0.4, "primary"), agrees=False),
+    )
+    result = read(pipeline, fallback)
+    assert result.api_usage == ApiUsage(calls=2, input_tokens=20, output_tokens=2)
+    assert result.to_dict()["api_usage"] == {"calls": 2, "input_tokens": 20, "output_tokens": 2}
+    result_validator.validate(result.to_dict())
+
+
+def test_no_bill_without_an_answer() -> None:
+    assert read(StubPipeline(line(("GJ07966", 0.97, "primary")))).api_usage is None
+    doubtful = line(("GJ07968", 0.4, "primary"), agrees=False)
+    result = read(StubPipeline(doubtful), FakeFallback(fail=True))
+    assert result.api_usage is None
+    assert "api_usage" not in result.to_dict()

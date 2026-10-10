@@ -20,6 +20,7 @@ def test_public_api() -> None:
     """Changing this list changes the public API: it needs maintainer approval."""
     assert tagsort.__all__ == [
         "AnthropicProvider",
+        "ApiUsage",
         "Candidate",
         "DeepSeekProvider",
         "GeminiProvider",

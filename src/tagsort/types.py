@@ -241,6 +241,36 @@ class OtherText:
 
 
 @dataclass(frozen=True)
+class ApiUsage:
+    """What reading one image cost at a vision API, for billing.
+
+    Attributes:
+        calls: Requests the provider answered.
+        input_tokens: Input tokens billed, over all those requests.
+        output_tokens: Output tokens billed (thinking tokens included).
+    """
+
+    calls: int
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def __post_init__(self) -> None:
+        """Check the counts are non-negative integers."""
+        for name in ("calls", "input_tokens", "output_tokens"):
+            value = getattr(self, name)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer, not {value!r}")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the JSON-ready form, as in ``result.v1.json``."""
+        return {
+            "calls": self.calls,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+        }
+
+
+@dataclass(frozen=True)
 class ReadResult:
     """Everything TagSort found in one image.
 
@@ -252,6 +282,9 @@ class ReadResult:
         timings_ms: Time spent in each pipeline stage, in milliseconds.
         other_texts: With open reading, the lines that fit no kind of tag, most likely
             tags first; empty otherwise (and then absent from the JSON form).
+        api_usage: Requests and tokens billed by a vision API for this image, when one
+            was asked (the API backend, or the fallback); ``None`` otherwise (and then
+            absent from the JSON form).
     """
 
     SCHEMA_VERSION: ClassVar[str] = "1.0"
@@ -263,6 +296,7 @@ class ReadResult:
     tags: tuple[Tag, ...] = ()
     timings_ms: Mapping[str, float] = field(default_factory=dict)
     other_texts: tuple[OtherText, ...] = ()
+    api_usage: ApiUsage | None = None
 
     def __post_init__(self) -> None:
         """Validate the fields and freeze the collections."""
@@ -285,6 +319,8 @@ class ReadResult:
             if not isinstance(other, OtherText):
                 raise TypeError(f"other_texts must be OtherText objects, not {other!r}")
         object.__setattr__(self, "other_texts", others)
+        if self.api_usage is not None and not isinstance(self.api_usage, ApiUsage):
+            raise TypeError(f"api_usage must be an ApiUsage, not {self.api_usage!r}")
 
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-ready form of this result, conforming to ``result.v1.json``."""
@@ -300,6 +336,7 @@ class ReadResult:
                 if self.other_texts
                 else {}
             ),
+            **({"api_usage": self.api_usage.to_dict()} if self.api_usage is not None else {}),
         }
 
     def to_json(self, *, indent: int | None = None) -> str:

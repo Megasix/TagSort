@@ -18,6 +18,7 @@ from tagsort.pipeline.local import LocalPipeline
 from tagsort.pipeline.reader import Reader
 from tagsort.profile import Profile, TagSpec
 from tagsort.types import (
+    ApiUsage,
     Candidate,
     ImageInfo,
     OtherText,
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AnthropicProvider",
+    "ApiUsage",
     "Candidate",
     "DeepSeekProvider",
     "GeminiProvider",

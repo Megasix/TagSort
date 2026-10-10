@@ -9,6 +9,10 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Added
 
+- `ReadResult.api_usage` (`ApiUsage`): the requests and tokens a vision API billed for
+  the image, from the API backend or the fallback, for cost accounting. Optional
+  `api_usage` in `result.v1.json`, absent when no vision API was asked.
+
 - NOTICE lists the third-party components of the Docker images: the PP-OCRv6 models
   (Apache 2.0, PaddlePaddle Authors) in both, and NVIDIA's CUDA and cuDNN libraries in the
   GPU image, which stay under NVIDIA's license agreements. Both images now ship LICENSE

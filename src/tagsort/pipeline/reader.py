@@ -12,13 +12,22 @@ from typing import Literal
 
 from tagsort._version import __version__
 from tagsort.errors import ProviderError
-from tagsort.fallback.base import ProviderTag, VisionProvider, VisionRequest
+from tagsort.fallback.base import ProviderTag, Usage, VisionProvider, VisionRequest
 from tagsort.fallback.prompt import ANSWER_SCHEMA, build_instructions
 from tagsort.pipeline.local import LineReading, LocalPipeline, PlainLine, score
 from tagsort.pipeline.openread import tag_likelihood
 from tagsort.pipeline.preprocess import ImageSource, PreparedImage, encode_jpeg, prepare
 from tagsort.profile import Profile
-from tagsort.types import Candidate, ImageInfo, OtherText, Point, ReadResult, Tag, TagStatus
+from tagsort.types import (
+    ApiUsage,
+    Candidate,
+    ImageInfo,
+    OtherText,
+    Point,
+    ReadResult,
+    Tag,
+    TagStatus,
+)
 
 __all__ = ["Reader"]
 
@@ -145,6 +154,7 @@ class Reader:
                 "preprocess": round((sent - start) * 1000, 1),
                 "api": round((done - sent) * 1000, 1),
             },
+            api_usage=_total([answer.usage]),
         )
 
     def read_batch(
@@ -196,13 +206,16 @@ class Reader:
         tags = []
         fallback_seconds = 0.0
         used_fallback = False
+        billed: list[Usage] = []
         for line in lines:
             tag = self._local_tag(line, prepared)
             if tag.status != "accepted" and self._fallback is not None:
                 asked = time.perf_counter()
-                tag = self._ask_fallback(self._fallback, line, prepared, tag)
+                tag, usage = self._ask_fallback(self._fallback, line, prepared, tag)
                 fallback_seconds += time.perf_counter() - asked
                 used_fallback = True
+                if usage is not None:
+                    billed.append(usage)
             tags.append(tag)
         timings = {
             "preprocess": round((prepared_at - start) * 1000, 1),
@@ -219,6 +232,7 @@ class Reader:
             tags=tuple(tags),
             timings_ms=timings,
             other_texts=_other_texts(plain, prepared),
+            api_usage=_total(billed),
         )
 
     def _local_tag(self, line: LineReading, prepared: PreparedImage) -> Tag:
@@ -254,8 +268,11 @@ class Reader:
 
     def _ask_fallback(
         self, provider: VisionProvider, line: LineReading, prepared: PreparedImage, local: Tag
-    ) -> Tag:
-        """Read the tag again from its crop alone; keep the local tag if that fails."""
+    ) -> tuple[Tag, Usage | None]:
+        """Read the tag again from its crop alone; keep the local tag if that fails.
+
+        Also returns what the provider billed, or ``None`` when it did not answer.
+        """
         crop = line.crop.copy()
         crop.thumbnail((provider.max_side, provider.max_side))
         request = VisionRequest(
@@ -271,11 +288,11 @@ class Reader:
             answer = provider.read(request)
         except ProviderError as error:
             logger.warning("fallback failed, keeping the local reading: %s", error)
-            return local
+            return local, None
         fitted = [self._without_stray_spaces(raw) for raw in answer.tags]
         valid = [raw for raw in fitted if self._profile.match(raw.text) is not None]
         if not valid:
-            return local
+            return local, answer.usage
         raw = max(valid, key=lambda r: r.legibility == "certain")
         tag = self._to_tag(raw, prepared)
         local_texts = [local.text, *(c.text for c in local.candidates)]
@@ -284,12 +301,13 @@ class Reader:
             for t in local_texts
             if t is not None and t != tag.text
         ]
-        return replace(
+        rescued = replace(
             tag,
             polygon=local.polygon,
             angle=local.angle,
             candidates=tuple(sorted({*tag.candidates, *candidates}, key=lambda c: -c.confidence)),
         )
+        return rescued, answer.usage
 
     def _to_tag(self, raw: ProviderTag, prepared: PreparedImage) -> Tag:
         raw = self._flag_upside_down_ambiguity(self._without_stray_spaces(raw))
@@ -412,6 +430,17 @@ def _polygon(
     shift = angle // 90
     rotated = corners[shift:] + corners[:shift]
     return (rotated[0], rotated[1], rotated[2], rotated[3])
+
+
+def _total(billed: list[Usage]) -> ApiUsage | None:
+    """What the vision API billed for one image, or ``None`` when it never answered."""
+    if not billed:
+        return None
+    return ApiUsage(
+        calls=len(billed),
+        input_tokens=sum(usage.input_tokens for usage in billed),
+        output_tokens=sum(usage.output_tokens for usage in billed),
+    )
 
 
 def _other_texts(lines: list[PlainLine], prepared: PreparedImage) -> tuple[OtherText, ...]:
