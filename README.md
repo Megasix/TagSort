@@ -106,7 +106,8 @@ On the reference set (160 photos, 60 tags), every configuration made zero silent
 0.51 USD per 1,000 photos. Details:
 [local models](https://github.com/Megasix/TagSort/blob/main/docs/local.md),
 [vision API providers](https://github.com/Megasix/TagSort/blob/main/docs/providers.md),
-[model card](https://github.com/Megasix/TagSort/blob/main/docs/model-card.md).
+[model card](https://github.com/Megasix/TagSort/blob/main/docs/model-card.md),
+[what reading costs: a local GPU or a vision API](https://github.com/Megasix/TagSort/blob/main/docs/costs.md).
 
 ## Profiles
 
