@@ -7,7 +7,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 import tagsort
-from tagsort import Candidate, ImageInfo, ReadResult, Tag
+from tagsort import ApiUsage, Candidate, ImageInfo, ReadResult, Tag
 
 SQUARE = ((812, 400), (1210, 410), (1205, 560), (808, 552))
 
@@ -204,3 +204,16 @@ def test_schema_version_is_not_a_field() -> None:
     with pytest.raises(TypeError):
         make_result(schema_version="2.0")
     assert ReadResult.SCHEMA_VERSION == "1.0"
+
+
+def test_api_usage_round_trips_and_validates(result_validator: Draft202012Validator) -> None:
+    result = make_result(api_usage=ApiUsage(calls=1, input_tokens=812, output_tokens=40))
+    document = result.to_dict()
+    assert document["api_usage"] == {"calls": 1, "input_tokens": 812, "output_tokens": 40}
+    result_validator.validate(document)
+    assert "api_usage" not in make_result().to_dict()
+    for bad in (-1, 1.5, True):
+        with pytest.raises(ValueError, match="calls"):
+            ApiUsage(calls=bad)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="api_usage"):
+        make_result(api_usage={"calls": 1})

@@ -60,6 +60,12 @@ def test_result_conforms_to_schema(result_validator: Draft202012Validator) -> No
     assert set(result.timings_ms) == {"preprocess", "api"}
 
 
+def test_the_api_bill_is_reported() -> None:
+    result = read(raw())
+    assert result.api_usage is not None
+    assert result.api_usage.calls == 1
+
+
 def test_certain_reading_that_fits_the_profile_is_accepted() -> None:
     (tag,) = read(raw()).tags
     assert (tag.tag_id, tag.text, tag.status, tag.source) == (
