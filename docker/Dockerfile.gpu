@@ -17,7 +17,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 COPY src ./src
 COPY docker/prune_nvidia_headers.py ./
-RUN uv sync --frozen --no-dev --no-editable --extra server --extra api
+RUN uv sync --frozen --no-dev --no-editable --extra server --extra api --extra codes
 # Swap the CPU build of ONNX Runtime for the GPU build of the same version.
 RUN version="$(/app/.venv/bin/python -c 'import onnxruntime; print(onnxruntime.__version__)')" \
  && uv pip uninstall --python /app/.venv/bin/python onnxruntime \

@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir "uv==0.12.*"
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE NOTICE ./
 COPY src ./src
-RUN uv sync --frozen --no-dev --no-editable --extra server --extra api
+RUN uv sync --frozen --no-dev --no-editable --extra server --extra api --extra codes
 # Models are downloaded here, explicitly, and checked against their manifest SHA-256.
 ENV TAGSORT_MODELS=/models
 RUN /app/.venv/bin/tagsort models download ppocrv6-tiny \

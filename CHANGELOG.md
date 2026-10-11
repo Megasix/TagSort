@@ -9,6 +9,13 @@ separately: a breaking change creates a new major version of the schema.
 
 ### Added
 
+- Barcodes and 2D codes: `Reader` decodes 1D barcodes, QR, Data Matrix, Aztec and PDF417
+  before reading text, with zxing-cpp (Apache 2.0, new `codes` extra, included in both
+  Docker images). A code that fits the profile, whole or in part (the end of a URL), is an
+  accepted tag with source `barcode` and no OCR; the same text printed under it is not
+  returned twice. `Reader(codes=False)` turns it off (`docs/barcodes.md`). Additive to
+  `result.v1.json`: `source` may be `"barcode"`.
+
 - `ReadResult.api_usage` (`ApiUsage`): the requests and tokens a vision API billed for
   the image, from the API backend or the fallback, for cost accounting. Optional
   `api_usage` in `result.v1.json`, absent when no vision API was asked.

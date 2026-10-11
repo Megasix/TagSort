@@ -181,8 +181,8 @@
           "items": { "$ref": "#/$defs/candidate" }
         },
         "source": {
-          "description": "local: read by the on-device models. fallback: read by the vision API fallback.",
-          "enum": ["local", "fallback"]
+          "description": "local: read by the on-device models. fallback: read by the vision API fallback. barcode: decoded from a barcode or 2D code (QR, Data Matrix) on the tag.",
+          "enum": ["local", "fallback", "barcode"]
         }
       },
       "allOf": [

@@ -54,6 +54,10 @@ server = [
 ]
 # PaddlePaddle and PaddleOCR training tools (M5). Never imported by the core.
 train = []
+# Barcodes and 2D codes on tags (zxing-cpp, Apache 2.0): decoded before any text.
+codes = [
+    "zxing-cpp>=3.1",
+]
 
 [dependency-groups]
 dev = [
