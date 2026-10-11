@@ -11,9 +11,16 @@ from dataclasses import replace
 from typing import Literal
 
 from tagsort._version import __version__
-from tagsort.errors import ProviderError
+from tagsort.errors import ProviderError, TagSortError
 from tagsort.fallback.base import ProviderTag, Usage, VisionProvider, VisionRequest
 from tagsort.fallback.prompt import ANSWER_SCHEMA, build_instructions
+from tagsort.pipeline.codes import (
+    CodeDecoder,
+    DecodedCode,
+    ZxingDecoder,
+    fit_code,
+    zxing_installed,
+)
 from tagsort.pipeline.local import LineReading, LocalPipeline, PlainLine, score
 from tagsort.pipeline.openread import tag_likelihood
 from tagsort.pipeline.preprocess import ImageSource, PreparedImage, encode_jpeg, prepare
@@ -65,6 +72,11 @@ class Reader:
         open_reading: With a local backend, also return in ``other_texts`` the lines that
             fit no kind of tag, each with how likely it is a specimen tag
             (``docs/open-reading.md``). Off by default.
+        codes: Decode barcodes and 2D codes (QR, Data Matrix) before reading text; a code
+            that fits the profile is an accepted tag with source ``barcode``
+            (``docs/barcodes.md``). By default, whenever the ``codes`` extra is
+            installed; ``True`` requires it, ``False`` turns decoding off, and a
+            :class:`CodeDecoder` replaces the zxing-cpp decoder.
 
     Raises:
         ValueError: If the thresholds are not ``0 <= review <= accept <= 1``, or a
@@ -81,6 +93,7 @@ class Reader:
         accept_threshold: float = 0.9,
         review_threshold: float = 0.25,
         open_reading: bool = False,
+        codes: CodeDecoder | bool | None = None,
     ) -> None:
         """Create the reader."""
         if not isinstance(profile, Profile):
@@ -108,6 +121,20 @@ class Reader:
         self._accept = accept_threshold
         self._review = review_threshold
         self._open_reading = open_reading
+        if codes is None:
+            self._codes: CodeDecoder | None = ZxingDecoder() if zxing_installed() else None
+        elif codes is True:
+            if not zxing_installed():
+                raise TagSortError("codes=True needs the codes extra: pip install 'tagsort[codes]'")
+            self._codes = ZxingDecoder()
+        elif codes is False:
+            self._codes = None
+        elif isinstance(codes, CodeDecoder):
+            self._codes = codes
+        else:
+            raise TypeError(
+                f"codes must be None, a bool or a CodeDecoder, not {type(codes).__name__}"
+            )
 
     @property
     def profile(self) -> Profile:
@@ -130,6 +157,7 @@ class Reader:
         start = time.perf_counter()
         prepared = prepare(image, max_side=self._backend.max_side)
         working = prepared.image
+        code_tags, _ = self._read_codes(prepared)
         request = VisionRequest(
             jpeg=encode_jpeg(working),
             width=working.width,
@@ -145,11 +173,19 @@ class Reader:
         sent = time.perf_counter()
         answer = self._backend.read(request)
         done = time.perf_counter()
+        decoded = {tag.text for tag in code_tags}
         return ReadResult(
             engine_version=__version__,
             model_version=f"{self._backend.name}:{answer.model}",
             image=ImageInfo(prepared.width, prepared.height, prepared.exif_rotation),
-            tags=tuple(self._to_tag(raw, prepared) for raw in answer.tags),
+            tags=(
+                *code_tags,
+                *(
+                    tag
+                    for tag in (self._to_tag(raw, prepared) for raw in answer.tags)
+                    if tag.text not in decoded
+                ),
+            ),
             timings_ms={
                 "preprocess": round((sent - start) * 1000, 1),
                 "api": round((done - sent) * 1000, 1),
@@ -198,17 +234,23 @@ class Reader:
         start = time.perf_counter()
         prepared = prepare(image, max_side=LOCAL_MAX_SIDE)
         prepared_at = time.perf_counter()
+        code_tags, code_texts = self._read_codes(prepared)
+        decoded = {tag.text for tag in code_tags}
+        codes_at = time.perf_counter()
         if self._open_reading:
             lines, plain = local.read_all(prepared.image, self._profile)
         else:
             lines, plain = local.read(prepared.image, self._profile), []
         read_at = time.perf_counter()
-        tags = []
+        tags: list[Tag] = list(code_tags)
         fallback_seconds = 0.0
         used_fallback = False
         billed: list[Usage] = []
         for line in lines:
             tag = self._local_tag(line, prepared)
+            # The text printed under a barcode reads the same: the code already gave it.
+            if tag.text is not None and tag.text in decoded:
+                continue
             if tag.status != "accepted" and self._fallback is not None:
                 asked = time.perf_counter()
                 tag, usage = self._ask_fallback(self._fallback, line, prepared, tag)
@@ -219,7 +261,8 @@ class Reader:
             tags.append(tag)
         timings = {
             "preprocess": round((prepared_at - start) * 1000, 1),
-            "local": round((read_at - prepared_at) * 1000, 1),
+            "codes": round((codes_at - prepared_at) * 1000, 1),
+            "local": round((read_at - codes_at) * 1000, 1),
         }
         model_version = f"local:{local.model}-{local.version}"
         if used_fallback and self._fallback is not None:
@@ -231,8 +274,60 @@ class Reader:
             image=ImageInfo(prepared.width, prepared.height, prepared.exif_rotation),
             tags=tuple(tags),
             timings_ms=timings,
-            other_texts=_other_texts(plain, prepared),
+            other_texts=tuple(
+                sorted(
+                    (*_other_texts(plain, prepared), *(code_texts if self._open_reading else ())),
+                    key=lambda other: other.tag_likelihood,
+                    reverse=True,
+                )
+            ),
             api_usage=_total(billed),
+        )
+
+    def _read_codes(self, prepared: PreparedImage) -> tuple[list[Tag], list[OtherText]]:
+        """Decode the codes in the image.
+
+        Returns tags for the codes that fit the profile, other texts for the rest.
+        """
+        if self._codes is None:
+            return [], []
+        tags: list[Tag] = []
+        others: list[OtherText] = []
+        for code in self._codes.decode(prepared.image):
+            fits = fit_code(code.text, self._profile)
+            if fits:
+                tags.append(self._code_tag(code, fits, prepared))
+            else:
+                text = " ".join(code.text.split())
+                likelihood, kind = tag_likelihood(text)
+                others.append(
+                    OtherText(
+                        text=text,
+                        confidence=1.0,
+                        tag_likelihood=likelihood,
+                        kind_guess=kind,
+                        polygon=_scale(code.quad, prepared.scale),
+                        angle=round(code.angle, 1) % 360,
+                    )
+                )
+        return tags, others
+
+    def _code_tag(
+        self, code: DecodedCode, fits: list[tuple[str, str]], prepared: PreparedImage
+    ) -> Tag:
+        """A decoded code is certain, unless several of its parts fit the profile."""
+        (text, tag_id), *rest = fits
+        certain = not rest
+        confidence = 1.0 if certain else _UNCERTAIN_AND_VALID
+        return Tag(
+            tag_id=tag_id,
+            text=text,
+            confidence=confidence,
+            status=self._status(confidence),
+            polygon=_scale(code.quad, prepared.scale),
+            angle=round(code.angle, 1) % 360,
+            candidates=tuple(Candidate(other, _ALTERNATIVE_VALID) for other, _ in rest),
+            source="barcode",
         )
 
     def _local_tag(self, line: LineReading, prepared: PreparedImage) -> Tag:

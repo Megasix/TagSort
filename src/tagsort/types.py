@@ -21,8 +21,9 @@ TagStatus = Literal["accepted", "review", "unreadable"]
 """``accepted``: confident reading. ``review``: a person should check it.
 ``unreadable``: no reading."""
 
-TagSource = Literal["local", "fallback"]
-"""``local``: read by the on-device models. ``fallback``: read by the vision API fallback."""
+TagSource = Literal["local", "fallback", "barcode"]
+"""``local``: read by the on-device models. ``fallback``: read by the vision API fallback.
+``barcode``: decoded from a barcode or 2D code (QR, Data Matrix) on the tag."""
 
 Point = tuple[float, float]
 """``(x, y)`` in pixels of the original image after EXIF rotation."""

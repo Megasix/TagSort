@@ -107,7 +107,7 @@ def test_agreeing_confident_reading_is_accepted(result_validator: Draft202012Val
     assert [c.text for c in tag.candidates] == ["GJ07986"]
     assert tag.polygon[0] == (10.0, 20.0)
     assert result.model_version == "local:stub-1.0"
-    assert set(result.timings_ms) == {"preprocess", "local"}
+    assert set(result.timings_ms) == {"preprocess", "codes", "local"}
     result_validator.validate(result.to_dict())
 
 

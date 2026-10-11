@@ -107,7 +107,8 @@ On the reference set (160 photos, 60 tags), every configuration made zero silent
 [local models](https://github.com/Megasix/TagSort/blob/main/docs/local.md),
 [vision API providers](https://github.com/Megasix/TagSort/blob/main/docs/providers.md),
 [model card](https://github.com/Megasix/TagSort/blob/main/docs/model-card.md),
-[what reading costs: a local GPU or a vision API](https://github.com/Megasix/TagSort/blob/main/docs/costs.md).
+[what reading costs: a local GPU or a vision API](https://github.com/Megasix/TagSort/blob/main/docs/costs.md),
+[barcodes and QR codes](https://github.com/Megasix/TagSort/blob/main/docs/barcodes.md).
 
 ## Profiles
 
