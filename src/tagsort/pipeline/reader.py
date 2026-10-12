@@ -21,6 +21,7 @@ from tagsort.pipeline.codes import (
     fit_code,
     zxing_installed,
 )
+from tagsort.pipeline.confusables import other_kind_readings
 from tagsort.pipeline.local import LineReading, LocalPipeline, PlainLine, score
 from tagsort.pipeline.openread import tag_likelihood
 from tagsort.pipeline.preprocess import ImageSource, PreparedImage, encode_jpeg, prepare
@@ -340,6 +341,14 @@ class Reader:
             confidence = min(confidence, _UNCERTAIN_AND_VALID)
             if flipped not in {t for t, _ in others}:
                 others.append((flipped, 0.0))
+        swapped = other_kind_readings(self._profile, text, tag_id)
+        if swapped:
+            # One confusable character (S/5, O/0…) away from another kind of tag: the
+            # recognizer cannot settle which, a person does (#123).
+            confidence = min(confidence, _UNCERTAIN_AND_VALID)
+            for variant in swapped:
+                if variant not in {t for t, _ in others}:
+                    others.append((variant, 0.0))
         status = self._status(confidence)
         best: str | None = text
         if status == "unreadable":

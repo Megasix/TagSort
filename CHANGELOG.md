@@ -7,6 +7,13 @@ separately: a breaking change creates a new major version of the schema.
 
 ## Unreleased
 
+### Changed
+
+- A local reading one confusable character away from another kind of tag (S/5, O/0, I/1,
+  B/8, Z/2, G/6: `FW54019` against `FWS4019`) goes to review with both readings, instead of
+  being accepted as the first kind. On lot-03 (small model), 2 of 14 silent errors fewer for
+  3 more tags to review; the lot-02 reference set is unchanged (0 silent errors).
+
 ### Added
 
 - Barcodes and 2D codes: `Reader` decodes 1D barcodes, QR, Data Matrix, Aztec and PDF417
