@@ -1,7 +1,7 @@
-"""Characters a recognizer confuses, and readings they make ambiguous between kinds of tag.
+r"""Characters a recognizer confuses, and readings they make ambiguous between kinds of tag.
 
-``FW54019`` fits a kind ``[A-Z]{2}\\d{5}``; with ``5`` read for ``S`` it would be
-``FWS4019``, which fits another kind ``FWS\\d{4}``. The recognizer cannot tell such pairs
+``FW54019`` fits a kind ``[A-Z]{2}\d{5}``; with ``5`` read for ``S`` it would be
+``FWS4019``, which fits another kind ``FWS\d{4}``. The recognizer cannot tell such pairs
 apart on a worn handwritten tag, so a reading one swap away from another kind of tag is
 left for a person to choose, with both readings (lot-03, #123).
 """
