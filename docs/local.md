@@ -71,5 +71,8 @@ To check a port, use the reference vectors in
 (`reference/images/`) with the profile, the detected boxes, every line's readings and
 probabilities, and the final tags. A port must reproduce texts, tag ids and statuses
 exactly, and numbers within the stated tolerances. The pattern grammar has its own
-vectors in [`reference/grammar.v1.json`](../reference/grammar.v1.json).
-`scripts/make_reference.py` regenerates the vectors when a model or the pipeline changes.
+vectors in [`reference/grammar.v1.json`](../reference/grammar.v1.json), and CTC decoding
+(greedy and constrained by a pattern) in
+[`reference/decode.v1.json`](../reference/decode.v1.json).
+`scripts/make_reference.py` regenerates the pipeline vectors when a model or the pipeline
+changes; `scripts/make_decode_reference.py` regenerates the decoding vectors.
