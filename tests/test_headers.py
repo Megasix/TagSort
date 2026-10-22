@@ -16,7 +16,7 @@ PROFILE = Profile.from_dict(
         "tags_per_individual": 1,
         "tags": [
             {"id": "plain", "pattern": "\\d{5}"},
-            {"id": "printed_a", "pattern": "\\d{5}", "header": "NATIONAL MUSEUM OF CANADA"},
+            {"id": "printed_a", "pattern": "\\d{5}", "header": "ENTOMOLOGY COLLECTION"},
             {"id": "printed_b", "pattern": "\\d{4,5}", "header": "Herbarium B"},
             {"id": "letters", "pattern": "MD\\d{5}"},
         ],
@@ -25,12 +25,12 @@ PROFILE = Profile.from_dict(
 
 
 def test_normalize_keeps_letters_and_digits_in_capitals() -> None:
-    assert normalize("National Museum\nof Canada, 1921") == "NATIONALMUSEUMOFCANADA1921"
+    assert normalize("Entomology\nCollection, 1921") == "ENTOMOLOGYCOLLECTION1921"
 
 
 def test_a_header_is_seen_despite_reading_errors_and_line_breaks() -> None:
-    assert headers_seen(PROFILE, ["NATIONAL MUSEUM", "OF CANADA", "16368"]) == {"printed_a"}
-    assert headers_seen(PROFILE, ["NATI0NAL MUSEUM 0F CANADA"]) == {"printed_a"}
+    assert headers_seen(PROFILE, ["ENTOMOLOGY", "COLLECTION", "16368"]) == {"printed_a"}
+    assert headers_seen(PROFILE, ["ENT0M0LOGY C0LLECTION"]) == {"printed_a"}
     assert headers_seen(PROFILE, ["HERBARIUM B", "1234"]) == {"printed_b"}
     assert headers_seen(PROFILE, ["16368", "a ruler", "MD00001"]) == frozenset()
 
@@ -64,7 +64,7 @@ def test_readings_of_other_shapes_keep_their_kind() -> None:
 
 def test_header_round_trips_and_is_checked() -> None:
     data = PROFILE.to_dict()
-    assert data["tags"][1]["header"] == "NATIONAL MUSEUM OF CANADA"
+    assert data["tags"][1]["header"] == "ENTOMOLOGY COLLECTION"
     assert "header" not in data["tags"][0]
     assert Profile.from_dict(data) == PROFILE
     for bad in ("", "   ", "x" * 201, 12):
@@ -118,7 +118,7 @@ def _tag(text: str, tag_id: str) -> LineReading:
 def test_the_pipeline_reports_the_kind_its_printed_header_points_to() -> None:
     image = Image.new("RGB", (100, 100))
     pipeline = _Lines(
-        [(None, "NATIONAL MUSEUM"), (None, "OF CANADA"), (_tag("16368", "plain"), "16368")]
+        [(None, "ENTOMOLOGY"), (None, "COLLECTION"), (_tag("16368", "plain"), "16368")]
     )
     [line] = pipeline.read(image, PROFILE)
     assert line.readings == (("16368", 0.95, "printed_a"),)

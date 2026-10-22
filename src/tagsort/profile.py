@@ -36,9 +36,9 @@ class TagSpec:
             a letter, then up to 63 letters, digits, ``_`` or ``-``.
         pattern: Every text this kind of tag may carry, in the regex subset described in
             ``docs/patterns.md``. Always matched against the whole text.
-        header: Optional text printed on this kind of tag, such as ``NATIONAL MUSEUM OF
-            CANADA``. When several kinds accept the same reading, the one whose header is
-            seen in the photo wins (see ``docs/headers.md``).
+        header: Optional text printed on this kind of tag, such as
+            ``ENTOMOLOGY COLLECTION``. When several kinds accept the same reading, the
+            one whose header is seen in the photo wins (see ``docs/headers.md``).
 
     Raises:
         PatternError: If ``pattern`` is outside the supported subset.

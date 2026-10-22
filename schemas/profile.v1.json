@@ -44,7 +44,7 @@
           "minLength": 1
         },
         "header": {
-          "description": "Optional text printed on this kind of tag, such as NATIONAL MUSEUM OF CANADA. When several kinds accept the same reading, the kind whose header is seen in the photo is reported (docs/headers.md). Optional, so profiles without it are unchanged.",
+          "description": "Optional text printed on this kind of tag, such as ENTOMOLOGY COLLECTION. When several kinds accept the same reading, the kind whose header is seen in the photo is reported (docs/headers.md). Optional, so profiles without it are unchanged.",
           "type": "string",
           "minLength": 1,
           "maxLength": 200

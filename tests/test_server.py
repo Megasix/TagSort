@@ -77,7 +77,7 @@ class StubPipeline(LocalPipeline):
     ) -> tuple[list[LineReading], list[PlainLine]]:
         quad = ((10.0, 40.0), (90.0, 40.0), (90.0, 60.0), (10.0, 60.0))
         return self.read(image, profile), [
-            PlainLine(text="NATIONAL MUSEUM", confidence=0.8, quad=quad, angle=0.0),
+            PlainLine(text="ENTOMOLOGY", confidence=0.8, quad=quad, angle=0.0),
             PlainLine(text="15950-1", confidence=0.9, quad=quad, angle=0.0),
         ]
 
@@ -380,6 +380,6 @@ def test_open_reading_adds_the_other_lines_most_likely_tags_first() -> None:
     check({"$ref": "result.v1.json"}, opened)
     assert [(o["text"], o["kind_guess"]) for o in opened["other_texts"]] == [
         ("15950-1", "id"),
-        ("NATIONAL MUSEUM", "header"),
+        ("ENTOMOLOGY", "header"),
     ]
     assert opened["tags"] == plain["tags"]

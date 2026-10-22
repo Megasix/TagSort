@@ -28,7 +28,7 @@ PROFILE = Profile.from_dict(
         "tags_per_individual": 1,
         "tags": [
             {"id": "primary", "pattern": "GJ\\d{5}"},
-            {"id": "loan", "pattern": "UNB\\d{4}"},
+            {"id": "loan", "pattern": "XYZ\\d{4}"},
         ],
     }
 )
@@ -99,7 +99,7 @@ def test_fit_code_tries_the_whole_text_then_its_parts() -> None:
     ]
     assert fit_code("4006381333931", PROFILE) == []
     # Two numbers in one code: a person decides.
-    assert fit_code("GJ07470;UNB1234", PROFILE) == [("GJ07470", "primary"), ("UNB1234", "loan")]
+    assert fit_code("GJ07470;XYZ1234", PROFILE) == [("GJ07470", "primary"), ("XYZ1234", "loan")]
 
 
 @pytest.mark.parametrize(
@@ -141,20 +141,20 @@ def test_a_qr_tag_is_read_with_no_ocr(result_validator: Draft202012Validator) ->
 
 
 def test_the_text_printed_under_a_barcode_is_not_returned_twice() -> None:
-    pipeline = StubPipeline("UNB1234", "GJ07470")
+    pipeline = StubPipeline("XYZ1234", "GJ07470")
     result = Reader(PROFILE, backend=pipeline).read(
-        photo("UNB1234", zxingcpp.BarcodeFormat.Code128)
+        photo("XYZ1234", zxingcpp.BarcodeFormat.Code128)
     )
     assert [(tag.text, tag.source) for tag in result.tags] == [
-        ("UNB1234", "barcode"),
+        ("XYZ1234", "barcode"),
         ("GJ07470", "local"),
     ]
 
 
 def test_a_code_with_two_numbers_needs_review() -> None:
-    (tag,) = Reader(PROFILE, backend=StubPipeline()).read(photo("GJ07470;UNB1234")).tags
+    (tag,) = Reader(PROFILE, backend=StubPipeline()).read(photo("GJ07470;XYZ1234")).tags
     assert tag.status == "review"
-    assert [c.text for c in tag.candidates] == ["UNB1234"]
+    assert [c.text for c in tag.candidates] == ["XYZ1234"]
 
 
 def test_codes_outside_the_profile_are_other_texts_with_open_reading() -> None:

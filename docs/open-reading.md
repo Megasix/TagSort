@@ -42,9 +42,9 @@ For now `tag_likelihood` comes from generic cues, true of specimen tags in most
 collections (`tagsort.pipeline.openread`):
 
 - specimen numbers hold digits, are short (3 to 16 characters) and have few words;
-- a few capital letters before the digits (`GJ07966`, `NMC16368`) and a dash or slash
+- a few capital letters before the digits (`GJ07966`, `ABC16368`) and a dash or slash
   between digits (`15950-1`, `12/345`) make a line more likely a tag;
-- printed words without digits are headers (`NATIONAL MUSEUM OF CANADA`);
+- printed words without digits are headers (`ENTOMOLOGY COLLECTION`);
 - rows of short numbers are rulers or scales, single characters are stray marks.
 
 These cues are a starting point: a selector trained on lines people kept and discarded

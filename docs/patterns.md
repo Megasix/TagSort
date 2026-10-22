@@ -20,7 +20,7 @@ for ports are in [`reference/grammar.v1.json`](../reference/grammar.v1.json).
 - **A gap is not a character.** When reading, a space where the pattern allows none is
   ignored, and the tag is reported without it: `GJ\d{5}` reads a tag written `GJ 07966`
   as `GJ07966`, as surely as one written without the gap. Where the pattern has a space
-  (`NMC \d{5}`), the space is required there. Other characters, such as a dash, always
+  (`ABC \d{5}`), the space is required there. Other characters, such as a dash, always
   count.
 
 ## Syntax

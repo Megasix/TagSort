@@ -1,6 +1,6 @@
 """Printed headers: choosing the kind of tag from text printed on it.
 
-Many collections use pre-printed tags: a printed header (``NATIONAL MUSEUM OF CANADA``)
+Many collections use pre-printed tags: a printed header (``ENTOMOLOGY COLLECTION``)
 and a number written by hand. The number alone may fit several kinds of tag; the header
 says which. A profile gives a kind its ``header``; when a reading fits several kinds, the
 kind whose header is seen in the photo is reported. See ``docs/headers.md``.

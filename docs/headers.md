@@ -1,7 +1,7 @@
 # Printed headers
 
 Many collections use pre-printed tags: a header printed on every tag, such as
-`NATIONAL MUSEUM OF CANADA` or `HERBARIUM B`, and a number written by hand. The number
+`ENTOMOLOGY COLLECTION` or `HERBARIUM B`, and a number written by hand. The number
 alone may fit several kinds of tag in a profile (five digits, for instance); the header
 says which kind it is.
 
@@ -15,7 +15,7 @@ Give the kind an optional `header`:
   "name": "Museum A",
   "tags_per_individual": 1,
   "tags": [
-    { "id": "museum_a", "pattern": "\\d{5}", "header": "NATIONAL MUSEUM OF CANADA" },
+    { "id": "museum_a", "pattern": "\\d{5}", "header": "ENTOMOLOGY COLLECTION" },
     { "id": "loan", "pattern": "\\d{5}" }
   ]
 }
@@ -39,7 +39,7 @@ When a reading fits several kinds, TagSort reports, in this order:
 
 Within each group, the profile's order decides. A reading that fits only one kind keeps
 it. The header itself is never reported as a tag: applications decide what to do with
-the kind, for instance put a short prefix such as `NMC` in front of the number.
+the kind, for instance put a short prefix such as `ABC` in front of the number.
 
 ## Limits
 

@@ -37,7 +37,7 @@ separately: a breaking change creates a new major version of the schema.
   tag and a guess of what it is (`docs/open-reading.md`). Optional in `result.v1.json`.
 
 - Printed headers: a kind of tag in a profile may have a `header`, text printed on that
-  kind of tag (`NATIONAL MUSEUM OF CANADA`). When a reading fits several kinds, the kind
+  kind of tag (`ENTOMOLOGY COLLECTION`). When a reading fits several kinds, the kind
   whose header is seen in the photo is reported (`docs/headers.md`). Optional in
   `profile.v1.json`; profiles without it are unchanged.
 
