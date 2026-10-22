@@ -7,7 +7,7 @@ from tagsort.pipeline.openread import tag_likelihood
 
 @pytest.mark.parametrize(
     "text",
-    ["15950-1", "GJ07966", "NMC16368", "MDX-4848", "12/345", "973213", "FWS 4019"],
+    ["15950-1", "GJ07966", "ABC16368", "MDX-4848", "12/345", "973213", "FWS 4019"],
 )
 def test_specimen_numbers_are_likely_tags(text: str) -> None:
     score, kind = tag_likelihood(text)
@@ -18,7 +18,7 @@ def test_specimen_numbers_are_likely_tags(text: str) -> None:
 @pytest.mark.parametrize(
     ("text", "kind"),
     [
-        ("NATIONAL MUSEUM OF CANADA", "header"),
+        ("ENTOMOLOGY COLLECTION", "header"),
         ("Herbarium", "header"),
         ("1 2 3 4 5 6", "noise"),
         ("x", "noise"),

@@ -6,9 +6,9 @@ being a specimen tag and a guess of what it is. The cues are deliberately generi
 specimen tags in most collections, and are meant to be replaced by a trained selector:
 
 - specimen numbers hold digits, are short (3 to 16 characters) and have few words;
-- a few capital letters before the digits (``GJ``, ``NMC``) and a dash or slash inside
+- a few capital letters before the digits (``GJ``, ``ABC``) and a dash or slash inside
   (``15950-1``, ``12/345``) are common;
-- printed headers are words without digits (``NATIONAL MUSEUM OF CANADA``);
+- printed headers are words without digits (``ENTOMOLOGY COLLECTION``);
 - rulers and scales are rows of short numbers (``1 2 3 4 5``), and single characters are
   stray marks.
 """
